@@ -1,0 +1,9 @@
+basespace_cmd: "/home/ubuntu/SARS_CoV_2_Workflow/bin/basespace"
+batch_limit: 50
+kraken2_db: "/home/ubuntu/AST_Workflow/kraken2db/"
+
+# phoenix commands
+phoenix_version: "v1.1.0"
+phoenix_cmd: "cdcgov/phoenix -r"
+phoenix_cmd_resume: "cdcgov/phoenix -resume -r"
+phoenix_cmd_trailing: "-profile docker -entry PHOENIX --max_memory 7.GB --max_cpus 4"
