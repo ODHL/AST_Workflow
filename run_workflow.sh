@@ -19,19 +19,16 @@ helpFunction()
 {
    echo ""
    echo "Usage: $1 -m [REQUIRED]pipeline mode options"
-   echo -e "\t-m options: init, run"
+   echo -e "\t-m options: init, all, phoenix, dryad, cleanup, report"
    echo "Usage: $2 -n [REQUIRED] project_id"
    echo -e "\t-n project id"
-   echo "Usage: $3 -q [OPTIONAL] qc_flag"
-   echo -e "\t-q Y,N option to run QC analysis (default Y)"
+   echo "Usage: $3 -r [OPTIONAL] resume_run"
+   echo -e "\t-p Y,N option to resume a partial run settings (default N)"
    echo "Usage: $4 -t [OPTIONAL] testing_flag"
    echo -e "\t-t Y,N option to run test settings (default N)"
-   echo "Usage: $5 -r [OPTIONAL] resume_run"
-   echo -e "\t-p Y,N option to resume a partial run settings (default N)"
+  
    exit 1 # Exit script after printing help
 }
-
-
 
 check_initialization(){
   if [[ ! -d $log_dir ]] || [[ ! -f "$pipeline_config" ]]; then
@@ -47,14 +44,13 @@ source $(dirname "$0")/scripts/functions.sh
 #############################################################################################
 # helper function
 #############################################################################################
-while getopts "m:n:q:t:r:" opt
+while getopts "p:n:r:t:" opt
 do
    case "$opt" in
-        m ) pipeline="$OPTARG" ;;
+        p ) pipeline="$OPTARG" ;;
         n ) project_id="$OPTARG" ;;
-        q ) qc_flag="$OPTARG" ;;
-        t ) testing_flag="$OPTARG" ;;
         r ) resume_flag="$OPTARG" ;;
+        t ) testing_flag="$OPTARG" ;;
         ? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
    esac
 done
@@ -74,7 +70,7 @@ fi
 # To ensure consistency in all projects, remove all information after _
 project_name_full=$(echo $project_id | sed 's:/*$::')
 project_name=$(echo $project_id | cut -f1 -d "_" | cut -f1 -d " ")
-output_dir="/home/ubuntu/$project_name"
+output_dir="/home/ubuntu/output/$project_name"
 
 #set defaults for optional args
 if [ -z "$qc_flag" ]; then qc_flag="Y"; fi
@@ -116,7 +112,7 @@ if [[ "$pipeline" == "init" ]]; then
         if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
 
         ##parent
-        dir_list=(logs fastq phoenix qc tmp analysis)
+        dir_list=(logs fastq phoenix dryad qc tmp analysis)
         for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi; done
 
         ## logs
@@ -151,7 +147,7 @@ if [[ "$pipeline" == "init" ]]; then
         echo -e "Configs are ready to be edited:\n${log_dir}"
         echo "*** INITIALIZATION COMPLETE ***"
         echo
-elif [[ "$pipeline" == "phoenix" ]]; then
+elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "phoenix" ]]; then
 
         #############################################################################################
         # Run PHOENIX pipeline
@@ -173,13 +169,56 @@ elif [[ "$pipeline" == "phoenix" ]]; then
                 "${multiqc_config}" \
                 "${date_stamp}" \
                 "${pipeline_log}" \
-                "${qc_flag}" \
                 "${resume_flag}" \
                 "${testing_flag}"
 
-        # run QC
-        #bash scripts/seq_qc.sh \
-        #        "${output_dir}" \
-#                "${pipeline_config}"
+elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "dryad" ]]; then
+
+        #############################################################################################
+        # Run DRYAD pipeline
+        #############################################################################################
+        message_cmd_log "------------------------------------------------------------------------"
+        message_cmd_log "--- STARTING DRYAD PIPELINE ---"
+
+        # check initialization was completed
+        check_initialization
+
+        # Eval YAML args
+        date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
+
+        # run pipelien
+        bash scripts/dryad.sh \
+                "${output_dir}" \
+                "${project_name_full}" \
+                "${pipeline_config}" \
+                "${multiqc_config}" \
+                "${date_stamp}" \
+                "${pipeline_log}" \
+                "${resume_flag}" \
+                "${testing_flag}"
+                
+elif [[ "$pipeline" == "cleanup" ]]; then
+
+        #############################################################################################
+        # Run PHOENIX pipeline
+        #############################################################################################
+        message_cmd_log "------------------------------------------------------------------------"
+        message_cmd_log "--- Cleanup of PIPELINE ---"
+
+        bash scripts/cleanup.sh \
+                "${output_dir}"
+
+elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "report" ]]; then
+
+        #############################################################################################
+        # Run PHOENIX pipeline
+        #############################################################################################
+        message_cmd_log "------------------------------------------------------------------------"
+        message_cmd_log "--- PIPELINE REPORTING ---"
+
+        bash scripts/reporting.sh \
+                "${output_dir}" \
+                "${project_name_full}" \
+                "${pipeline_config}"
 
 fi

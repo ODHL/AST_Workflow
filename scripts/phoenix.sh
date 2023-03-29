@@ -7,8 +7,7 @@ pipeline_config=$3
 multiqc_config=$4
 date_stamp=$5
 pipeline_log=$6
-qc_flag=$7
-resume_flag=$8
+resume_flag=$7
 
 #########################################################
 # Pipeline controls
@@ -17,15 +16,11 @@ if [[ $resume_flag == "Y" ]]; then
 	flag_download="N"
 	flag_batch="N"
 	flag_phoenix="N"
-	flag_cleanup="N"
-	flag_reporting="N"
 	flag_resume="Y"
 else
 	flag_download="Y"
 	flag_batch="Y"
 	flag_phoenix="Y"
-	flag_cleanup="N"
-	flag_reporting="Y"
 	flag_resume="N"
 fi
 ##########################################################
@@ -70,10 +65,7 @@ phoenix_version=$config_phoenix_version
 phoenix_cmd=$config_phoenix_cmd
 phoenix_cmd_resume=$config_phoenix_cmd_resume
 phoenix_cmd_trailing=$config_phoenix_cmd_trailing
-
-#############################################################################################
-# PHOENIX UPDATES
-#############################################################################################
+nextflow_cmd=$config_nextflow_cmd
 
 #############################################################################################
 # LOG INFO TO CONFIG
@@ -85,7 +77,7 @@ message_cmd_log "Analysis date: `date`"
 message_cmd_log "Phoenix version: $phoenix_version"
 
 message_cmd_log "------------------------------------------------------------------------"
-message_cmd_log "--- STARTING PHOENIX ANALYSIS ---"
+message_cmd_log "--- STARTING Phoenix ANALYSIS ---"
 
 echo "Starting time: `date`" >> $pipeline_log
 echo "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
@@ -114,6 +106,7 @@ if [[ $flag_download == "Y" ]]; then
 	echo "---Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 
 fi
+
 #############################################################################################
 # Batching
 #############################################################################################
@@ -138,7 +131,7 @@ if [[ $flag_batch == "Y" ]]; then
 	    if [[ "$sample_count" -eq 1 ]]; then
     	    batch_count=$((batch_count+1))
 
-        	#remove previous versions of batch log
+        	# handle more than 9 batches
         	if [[ "$batch_count" -gt 9 ]]; then batch_name=$batch_count; else batch_name=0${batch_count}; fi
 			
 			#remove previous versions of batch log
@@ -163,7 +156,7 @@ if [[ $flag_batch == "Y" ]]; then
  		echo ${sample_id} >> $batch_manifest
                	
 		# prepare samplesheet
-            echo "${sample_id},$fastq_batch_dir/$sample_id.R1.fastq.gz,$fastq_batch_dir/$sample_id.R2.fastq.gz">>$samplesheet
+        echo "${sample_id},$fastq_batch_dir/$sample_id.R1.fastq.gz,$fastq_batch_dir/$sample_id.R2.fastq.gz">>$samplesheet
 
     	#increase sample counter
         ((sample_count+=1))
@@ -208,12 +201,18 @@ if [[ $flag_batch == "Y" ]]; then
 	touch $merged_summary
 	touch $merged_fragment
 fi
+
 #############################################################################################
-# Analysis
+# Phoenix Analysis
 #############################################################################################
+# first pass
 if [[ $flag_phoenix == "Y" ]]; then
 	#log
 	message_cmd_log "--Processing batches:"
+
+	# determine number of batches
+	batch_count=`ls $log_dir/batch* | wc -l`
+	batch_min=1
 
 	#for each batch
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
@@ -256,6 +255,7 @@ if [[ $flag_phoenix == "Y" ]]; then
 		# changes in software adds project name to some sample_ids. In order to ensure consistency throughout naming and for downstream
         # uploading, project name should be removed.
         cd $fastq_batch_dir
+		message_cmd_log "--------prepping FQ files"
 		for f in $fastq_batch_dir/*; do
                         	
 			# creat second proj name if there is additional info IE _AST
@@ -285,50 +285,19 @@ if [[ $flag_phoenix == "Y" ]]; then
 
 		# run phoenix
 		phoenix_full_cmd="$phoenix_cmd $phoenix_version $phoenix_cmd_trailing"
-		phoenix_cmd_line="$HOME/nextflow run $phoenix_full_cmd --input $samplesheet --kraken2db $config_kraken2_db --outdir $phoenix_batch_dir"
+		phoenix_cmd_line="$nextflow_cmd run $phoenix_full_cmd --input $samplesheet --kraken2db $config_kraken2_db --outdir $phoenix_batch_dir"
 		echo "$phoenix_cmd_line"
 		$phoenix_cmd_line
 
 		# log
     	echo "-------Ending time: `date`" >> $pipeline_log
 		echo "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
-
-		#############################################################################################
-		# cleanup
-		#############################################################################################
-		# move reports
-		cat $phoenix_batch_dir/Phoenix_Output_Report.tsv >> $final_results
-		mv $phoenix_batch_dir/*/*.t* $analysis_dir/sample_reports
-
-		# move fastqs
-		mv $phoenix_batch_dir/*/fastp_trimd/*.fastq.gz $analysis_dir/fasta
-
-		# move logs
-		mv $phoenix_batch_dir/pipeline_info/* $pipeline_logs_batch_dir
-		mv $phoenix_batch_dir/*/*.synopsis $pipeline_logs_batch_dir
-
-		# move qc
-		mv $phoenix_batch_dir/multiqc/multiqc_report.html $qc_dir
-		mv $phoenix_batch_dir/*/fastp_trimd/*html $analysis_dir/qc
-
-		# intermeds
-		dir_list=(AMRFinder ANI Annotation Assembly gamma_* kraken2_* mlst quast removedAdapters fastp_trimd)
-		for d in ${dir_list[@]}; do
-			short_name=`echo $d | cut -f1 -d"_"`
-			if [[ ! -d $intermed_dir/$short_name ]]; then mkdir $intermed_dir/$short_name; fi
-			mv $phoenix_batch_dir/*/$d/* $intermed_dir/$short_name
-		done
-
-		#remove intermediate files
-		if [[ $flag_cleanup == "Y" ]]; then
-			sudo rm -r --force $phoenix_batch_dir
-			sudo rm -r --force $fastq_batch_dir
-		fi
 	done
 fi
 
+# resume
 if [[ $flag_resume == "Y" ]]; then
-	echo "Resuming the pipeline"
+	echo "--Resuming the pipeline"
 		
 	# set samplesheet
 	samplesheet=$log_dir/samplesheets/samplesheet_01.csv
@@ -339,34 +308,7 @@ if [[ $flag_resume == "Y" ]]; then
 
 	# run phoenix
 	phoenix_full_cmd="$phoenix_cmd_resume $phoenix_version $phoenix_cmd_trailing"
-    phoenix_cmd_line="$HOME/nextflow run $phoenix_full_cmd --input $samplesheet --kraken2db $config_kraken2_db -w $work_dir --outdir $phoenix_batch_dir"
+    phoenix_cmd_line="$nextflow_cmd run $phoenix_full_cmd --input $samplesheet --kraken2db $config_kraken2_db -w $work_dir --outdir $phoenix_batch_dir"
 	echo "$phoenix_cmd_line"
 	$phoenix_cmd_line
-fi
-
-#############################################################################################
-# Create final reports
-#############################################################################################
-if [[ $flag_reporting == "Y" ]]; then
-	if [[ "$qc_flag" == "Y" ]]; then
-		#log
-		message_cmd_log "--Creating QC Report"
-		echo "---Starting time: `date`" >> $pipeline_log
-		echo "---Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
-
-		#create fragment plot
-		python3 scripts/fragment_plots.py $merged_fragment $fragement_plot
-	fi 
-	
-	if [[ $flag_cleanup == "Y" ]]; then
-		#remove all proj files
-		rm -r --force $tmp_dir
-		rm -r --force $phoenix_dir
-		rm -r --force $fastq_dir
-	fi
-
-	echo "Ending time: `date`" >> $pipeline_log
-	echo "Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
-	message_cmd_log "--- PHOENIX PIPELINE COMPLETE ---"
-	message_cmd_log "------------------------------------------------------------------------"
 fi

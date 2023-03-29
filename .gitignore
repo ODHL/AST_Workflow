@@ -27,6 +27,3 @@ hs_err_pid*
 
 # kraken
 kraken2db/
-
-# report repo
-ar_report_generator
