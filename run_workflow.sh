@@ -90,7 +90,9 @@ tmp_dir=$output_dir/tmp
 analysis_dir=$output_dir/analysis
 
 fasta_dir=$analysis_dir/fasta
+
 intermed_dir=$analysis_dir/intermed
+intermed_sample_dir=$intermed_dir/sample_level_data/assembly
 
 #set log files
 pipeline_log=$log_dir/pipeline_log.txt
@@ -119,8 +121,8 @@ if [[ "$pipeline" == "init" ]]; then
 	dir_list=(samplesheets pipeline_logs)
         for pd in "${dir_list[@]}"; do if [[ ! -d $log_dir/$pd ]]; then mkdir -p $log_dir/$pd; fi; done
 
-	##qc
-        dir_list=(qcreport)
+        ## qc
+        dir_list=(sample_level_data)
         for pd in "${dir_list[@]}"; do if [[ ! -d $qc_dir/$pd ]]; then mkdir -p $qc_dir/$pd; fi; done
 
         ##tmp
@@ -130,6 +132,12 @@ if [[ "$pipeline" == "init" ]]; then
         ##analysis
         dir_list=(fasta intermed sample_reports)
         for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi; done
+
+        ## intermed
+        dir_list=(sample_level_data)
+        for pd in "${dir_list[@]}"; do if [[ ! -d $intermed_dir/$pd ]]; then mkdir -p $intermed_dir/$pd; fi; done
+        dir_list=(ASSEMBLY AMRFinder ANI MLST)
+        for pd in "${dir_list[@]}"; do if [[ ! -d $intermed_sample_dir/$pd ]]; then mkdir -p $intermed_sample_dir/$pd; fi; done
 
         ##make files
         touch $pipeline_log
@@ -206,7 +214,9 @@ elif [[ "$pipeline" == "cleanup" ]]; then
         message_cmd_log "--- Cleanup of PIPELINE ---"
 
         bash scripts/cleanup.sh \
-                "${output_dir}"
+                "${output_dir}" \
+                "${project_name_full}" \
+                "${pipeline_config}"
 
 elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "report" ]]; then
 
