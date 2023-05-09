@@ -18,8 +18,8 @@
 helpFunction()
 {
    echo ""
-   echo "Usage: $1 -m [REQUIRED]pipeline mode options"
-   echo -e "\t-m options: init, all, phoenix, dryad, cleanup, report"
+   echo "Usage: $1 -p [REQUIRED] pipeline mode options"
+   echo -e "\t-m options: init, all, analysis, cleanup, report"
    echo "Usage: $2 -n [REQUIRED] project_id"
    echo -e "\t-n project id"
    echo "Usage: $3 -r [OPTIONAL] resume_run"
@@ -114,7 +114,7 @@ if [[ "$pipeline" == "init" ]]; then
         if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
 
         ##parent
-        dir_list=(logs fastq phoenix dryad qc tmp analysis)
+        dir_list=(logs fastq pipeline qc tmp analysis)
         for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi; done
 
         ## logs
@@ -155,13 +155,13 @@ if [[ "$pipeline" == "init" ]]; then
         echo -e "Configs are ready to be edited:\n${log_dir}"
         echo "*** INITIALIZATION COMPLETE ***"
         echo
-elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "phoenix" ]]; then
+elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "analysis" ]]; then
 
         #############################################################################################
-        # Run PHOENIX pipeline
+        # Run pipeline
         #############################################################################################
         message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- STARTING PHOENIX PIPELINE ---"
+        message_cmd_log "--- STARTING ANALYSIS ---"
 
         # check initialization was completed
         check_initialization
@@ -170,7 +170,7 @@ elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "phoenix" ]]; then
         date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
 
         # run pipelien
-        bash scripts/phoenix.sh \
+        bash scripts/analysis.sh \
                 "${output_dir}" \
                 "${project_name_full}" \
                 "${pipeline_config}" \
@@ -180,38 +180,13 @@ elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "phoenix" ]]; then
                 "${resume_flag}" \
                 "${testing_flag}"
 
-elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "dryad" ]]; then
-
-        #############################################################################################
-        # Run DRYAD pipeline
-        #############################################################################################
-        message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- STARTING DRYAD PIPELINE ---"
-
-        # check initialization was completed
-        check_initialization
-
-        # Eval YAML args
-        date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
-
-        # run pipelien
-        bash scripts/dryad.sh \
-                "${output_dir}" \
-                "${project_name_full}" \
-                "${pipeline_config}" \
-                "${multiqc_config}" \
-                "${date_stamp}" \
-                "${pipeline_log}" \
-                "${resume_flag}" \
-                "${testing_flag}"
-                
 elif [[ "$pipeline" == "cleanup" ]]; then
 
         #############################################################################################
-        # Run PHOENIX pipeline
+        # Run cleanup
         #############################################################################################
         message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- Cleanup of PIPELINE ---"
+        message_cmd_log "--- STARTING CLEANUP ---"
 
         bash scripts/cleanup.sh \
                 "${output_dir}" \
@@ -221,10 +196,10 @@ elif [[ "$pipeline" == "cleanup" ]]; then
 elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "report" ]]; then
 
         #############################################################################################
-        # Run PHOENIX pipeline
+        # Run reporting
         #############################################################################################
         message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- PIPELINE REPORTING ---"
+        message_cmd_log "--- STARTING REPORTING ---"
 
         bash scripts/reporting.sh \
                 "${output_dir}" \
