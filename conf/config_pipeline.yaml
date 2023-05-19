@@ -1,0 +1,20 @@
+# params
+batch_limit: 50
+
+# tools
+basespace_cmd: "/home/ubuntu/tools/basespace"
+kraken2_db: "/home/ubuntu/refs/kraken2db/"
+nextflow_cmd: "/home/ubuntu/tools/nextflow"
+ar_dir: "/home/ubuntu/tools/ar_report_generator"
+
+# analysis commands
+ODH_version: "v1.1.0"
+phoenix_version: "v1.1.0"
+dryad_version: "3.0.1"
+
+analysis_cmd: "-r"
+analysis_cmd_resume: "-resume -r"
+analysis_cmd_trailing: "-profile docker -entry ANALYSIS_RUN --max_memory 7.GB --max_cpus 4"
+
+# ref files
+ref_fasta: "/home/ubuntu/refs/ASM211692v1.fasta"

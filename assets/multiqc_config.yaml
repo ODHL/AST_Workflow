@@ -1,0 +1,15 @@
+#title info
+title: "ODHL AST Analysis QC Report"
+intro_text: "MultiQC reports summarise analysis results."
+report_header_info:
+  - Project Type: "COVID-19 Analysis"
+  - Sequencing Platform: "MiSeq 2500 High Output V4"
+  - Sequencing Setup: "2x150"
+
+report_section_order:
+    software_versions:
+        order: -1000
+    nf-core-quaisar-summary:
+        order: -1001
+
+export_plots: true

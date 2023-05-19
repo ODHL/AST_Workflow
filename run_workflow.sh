@@ -26,7 +26,9 @@ helpFunction()
    echo -e "\t-p Y,N option to resume a partial run settings (default N)"
    echo "Usage: $4 -t [OPTIONAL] testing_flag"
    echo -e "\t-t Y,N option to run test settings (default N)"
-  
+   echo "Usage: $5 -e [OPTIONAL] testing_flag"
+   echo -e "\t-t Y,N option to run test settings (default N)"
+
    exit 1 # Exit script after printing help
 }
 
@@ -38,7 +40,7 @@ check_initialization(){
 }
 
 # source global functions
-source $(dirname "$0")/scripts/functions.sh
+source $(dirname "$0")/bin/core_functions.sh
 
 
 #############################################################################################
@@ -79,7 +81,7 @@ if [ -z "$resume_flag" ]; then resume_flag="N"; fi
 
 #############################################################################################
 # Dir, Configs
-##############################################################################pipeline_config###############
+#############################################################################################
 # set dirs
 log_dir=$output_dir/logs
 
@@ -143,7 +145,7 @@ if [[ "$pipeline" == "init" ]]; then
         touch $pipeline_log
 
         # copy config inputs to edit if doesn't exit
-        files_save=("config/config_pipeline.yaml" "config/config_multiqc.yaml")
+        files_save=("conf/config_pipeline.yaml" "conf/config_multiqc.yaml")
         for f in ${files_save[@]}; do
                 IFS='/' read -r -a strarr <<< "$f"
                 if [[ ! -f "${log_dir}/${strarr[1]}" ]]; then
@@ -170,7 +172,7 @@ elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "analysis" ]]; then
         date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
 
         # run pipelien
-        bash scripts/analysis.sh \
+        bash bin/core_analysis.sh \
                 "${output_dir}" \
                 "${project_name_full}" \
                 "${pipeline_config}" \
@@ -188,7 +190,7 @@ elif [[ "$pipeline" == "cleanup" ]]; then
         message_cmd_log "------------------------------------------------------------------------"
         message_cmd_log "--- STARTING CLEANUP ---"
 
-        bash scripts/cleanup.sh \
+        bash bin/core_cleanup.sh \
                 "${output_dir}" \
                 "${project_name_full}" \
                 "${pipeline_config}"
@@ -201,7 +203,7 @@ elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "report" ]]; then
         message_cmd_log "------------------------------------------------------------------------"
         message_cmd_log "--- STARTING REPORTING ---"
 
-        bash scripts/reporting.sh \
+        bash bin/core_reporting.sh \
                 "${output_dir}" \
                 "${project_name_full}" \
                 "${pipeline_config}"
