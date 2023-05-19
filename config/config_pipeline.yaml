@@ -2,18 +2,19 @@
 batch_limit: 50
 
 # tools
-basespace_cmd: "/home/ubuntu/workflows/SARS_CoV_2_Workflow/bin/basespace"
-kraken2_db: "/home/ubuntu/workflows/AST_Workflow/kraken2db/"
+basespace_cmd: "/home/ubuntu/tools/basespace"
+kraken2_db: "/home/ubuntu/refs/kraken2db/"
 nextflow_cmd: "/home/ubuntu/tools/nextflow"
 ar_dir: "/home/ubuntu/tools/ar_report_generator"
 
-# phoenix commands
+# analysis commands
+ODH_version: "v1.1.0"
 phoenix_version: "v1.1.0"
-phoenix_cmd: "cdcgov/phoenix -r"
-phoenix_cmd_resume: "cdcgov/phoenix -resume -r"
-phoenix_cmd_trailing: "-profile docker -entry PHOENIX --max_memory 7.GB --max_cpus 4"
-
-# dryad commans
-dryad_cmd: "~/tools/nextflow run ~/tools/dryad/"
 dryad_version: "3.0.1"
+
+analysis_cmd: "ODHL/AST -r"
+analysis_cmd_resume: "ODHL/AST -resume -r"
+analysis_cmd_trailing: "-profile docker -entry PHOENIX --max_memory 7.GB --max_cpus 4"
+
+# ref files
 ref_fasta: "/home/ubuntu/refs/ASM211692v1.fasta"

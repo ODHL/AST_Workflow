@@ -8,6 +8,7 @@ multiqc_config=$4
 date_stamp=$5
 pipeline_log=$6
 resume_flag=$7
+flag_testing=$8
 
 #########################################################
 # Pipeline controls
@@ -15,12 +16,12 @@ resume_flag=$7
 if [[ $resume_flag == "Y" ]]; then
 	flag_download="N"
 	flag_batch="N"
-	flag_phoenix="N"
+	flag_analysis="N"
 	flag_resume="Y"
 else
 	flag_download="Y"
 	flag_batch="Y"
-	flag_phoenix="Y"
+	flag_analysis="Y"
 	flag_resume="N"
 fi
 ##########################################################
@@ -36,21 +37,25 @@ log_dir=$output_dir/logs
 pipeline_logs="$log_dir/pipeline_logs"
 samplesheet_dir=$log_dir/samplesheets
 
-phoenix_dir=$output_dir/phoenix
+# pipeline raw output
+pipeline_dir=$output_dir/pipeline
 fastq_dir=$output_dir/fastq
 
+## final analysis output
 analysis_dir=$output_dir/analysis
 sample_reports=$analysis_dir/sample_reports
 intermed_dir=$analysis_dir/intermed
 fasta_dir=$analysis_dir/fasta
 
+## QC output
 qc_dir=$output_dir/qc
 
+## tmp dir
 tmp_dir=$output_dir/tmp
 
 # set files
 merged_samples=$log_dir/completed_samples.txt
-merged_phoenix=$intermed_dir/phoenix_results.txt
+merged_pipeline=$intermed_dir/pipeline_results.txt
 merged_fragment=$qc_dir/fragment.txt
 sample_id_file=$log_dir/sample_ids.txt
 fragement_plot=$qc_dir/fragment_plot.png
@@ -59,12 +64,14 @@ final_results=$analysis_dir/final_results_$date_stamp.csv
 touch $final_results
 
 # set variables
+ODH_version=$config_ODH_version
 phoenix_version=$config_phoenix_version
+dryad_version=$config_dryad_version
 
 # set cmd
-phoenix_cmd=$config_phoenix_cmd
-phoenix_cmd_resume=$config_phoenix_cmd_resume
-phoenix_cmd_trailing=$config_phoenix_cmd_trailing
+analysis_cmd=$config_analysis_cmd
+analysis_cmd_resume=$config_analysis_cmd_resume
+analysis_cmd_trailing=$config_analysis_cmd_trailing
 nextflow_cmd=$config_nextflow_cmd
 
 #############################################################################################
@@ -74,10 +81,12 @@ message_cmd_log "---------------------------------------------------------------
 message_cmd_log "--- CONFIG INFORMATION ---"
 message_cmd_log "Sequence run date: $date_stamp"
 message_cmd_log "Analysis date: `date`"
+message_cmd_log "Pipeline version: $ODH_version"
 message_cmd_log "Phoenix version: $phoenix_version"
+message_cmd_log "Dryad version: $dryad_version"
 
 message_cmd_log "------------------------------------------------------------------------"
-message_cmd_log "--- STARTING Phoenix ANALYSIS ---"
+message_cmd_log "--- RUNNING ANALYSIS ---"
 
 echo "Starting time: `date`" >> $pipeline_log
 echo "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
@@ -171,14 +180,21 @@ if [[ $flag_batch == "Y" ]]; then
 	
 	# For testing scenarios two batches of two samples will be run
 	# Take the first four samples and remove all other batches
-	if [[ "$testing_flag" == "Y" ]]; then
+	if [[ "$flag_testing" == "Y" ]]; then
+		echo "--running testing params"
+
 		# create save dir for new batches
 		mkdir -p $log_dir/save
 		batch_manifest=$log_dir/batch_01.txt
 
 		# grab the first two samples and last two samples, save as new batches
-		head -2 $batch_manifest > $log_dir/save/batch_01.txt
-		tail -2 $batch_manifest > $log_dir/save/batch_02.txt
+		head -4 $batch_manifest > $log_dir/save/batch_01.txt
+		#tail -2 $batch_manifest > $log_dir/save/batch_02.txt
+
+		# fix samplesheet
+		samplesheet=$samplesheet_dir/samplesheet_${batch_name}.csv
+		head -5 $samplesheet > $log_dir/save/samplesheet.csv
+		mv $log_dir/save/samplesheet.csv $samplesheet
 
 		# remove old  manifests
 		rm $log_dir/batch_*
@@ -186,10 +202,6 @@ if [[ $flag_batch == "Y" ]]; then
 		# replace update manifests and cleanup
 		mv $log_dir/save/* $log_dir
 		sudo rm -r $log_dir/save
-
-		# set new batch count
-		batch_count=2
-		sample_count=4
 	fi
 
 	#log
@@ -197,7 +209,7 @@ if [[ $flag_batch == "Y" ]]; then
 
 	#merge all batched outputs
 	touch $merged_samples
-	touch $merged_phoenix
+	touch $merged_pipeline
 	touch $merged_summary
 	touch $merged_fragment
 fi
@@ -206,7 +218,7 @@ fi
 # Phoenix Analysis
 #############################################################################################
 # first pass
-if [[ $flag_phoenix == "Y" ]]; then
+if [[ $flag_analysis == "Y" ]]; then
 	#log
 	message_cmd_log "--Processing batches:"
 
@@ -223,10 +235,10 @@ if [[ $flag_phoenix == "Y" ]]; then
 		#set batch manifest, dirs
 		batch_manifest=$log_dir/batch_${batch_name}.txt
 		fastq_batch_dir=$fastq_dir/batch_$batch_id
-		phoenix_batch_dir=$phoenix_dir/batch_$batch_id
+		pipeline_batch_dir=$pipeline_dir/batch_$batch_id
 		pipeline_logs_batch_dir=$pipeline_logs/batch_$batch_id
 		if [[ ! -d $fastq_batch_dir ]]; then mkdir $fastq_batch_dir; fi
-		if [[ ! -d $phoenix_batch_dir ]]; then mkdir $phoenix_batch_dir; fi
+		if [[ ! -d $pipeline_batch_dir ]]; then mkdir $pipeline_batch_dir; fi
 		if [[ ! -d $pipeline_logs_batch_dir ]]; then mkdir $pipeline_logs_batch_dir; fi
 
 		#read text file
@@ -248,7 +260,7 @@ if [[ $flag_phoenix == "Y" ]]; then
 		done
 
 		#log
-		message_cmd_log "------PHOENIX"
+		message_cmd_log "------Analysis"
 		echo "-------Starting time: `date`" >> $pipeline_log
     	echo "-------Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 	
@@ -283,11 +295,11 @@ if [[ $flag_phoenix == "Y" ]]; then
 		# prepare samplesheet
 		samplesheet=$log_dir/samplesheets/samplesheet_0$batch_id.csv
 
-		# run phoenix
-		phoenix_full_cmd="$phoenix_cmd $phoenix_version $phoenix_cmd_trailing"
-		phoenix_cmd_line="$nextflow_cmd run $phoenix_full_cmd --input $samplesheet --kraken2db $config_kraken2_db --outdir $phoenix_batch_dir"
-		echo "$phoenix_cmd_line"
-		$phoenix_cmd_line
+		# run NEXTLFOW
+		pipeline_full_cmd="$analysis_cmd $ODH_version $analysis_cmd_trailing"
+		analysis_cmd_line="$nextflow_cmd run $pipeline_full_cmd --input $samplesheet --kraken2db $config_kraken2_db --outdir $pipeline_batch_dir"
+		echo "$analysis_cmd_line"
+		$analysis_cmd_line
 
 		# log
     	echo "-------Ending time: `date`" >> $pipeline_log
@@ -303,12 +315,12 @@ if [[ $flag_resume == "Y" ]]; then
 	samplesheet=$log_dir/samplesheets/samplesheet_01.csv
 
 	# batch dir
-	phoenix_batch_dir=$phoenix_dir/batch_1
+	pipeline_batch_dir=$pipeline_dir/batch_1
 	work_dir=$fastq_dir/batch_1/3*/work
 
 	# run phoenix
-	phoenix_full_cmd="$phoenix_cmd_resume $phoenix_version $phoenix_cmd_trailing"
-    phoenix_cmd_line="$nextflow_cmd run $phoenix_full_cmd --input $samplesheet --kraken2db $config_kraken2_db -w $work_dir --outdir $phoenix_batch_dir"
-	echo "$phoenix_cmd_line"
-	$phoenix_cmd_line
+	pipeline_full_cmd="$analysis_cmd_resume $phoenix_version $analysis_cmd_trailing"
+    analysis_cmd_line="$nextflow_cmd run $pipeline_full_cmd --input $samplesheet --kraken2db $config_kraken2_db -w $work_dir --outdir $pipeline_batch_dir"
+	echo "$analysis_cmd_line"
+	$analysis_cmd_line
 fi

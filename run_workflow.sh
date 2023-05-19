@@ -18,8 +18,8 @@
 helpFunction()
 {
    echo ""
-   echo "Usage: $1 -m [REQUIRED]pipeline mode options"
-   echo -e "\t-m options: init, all, phoenix, dryad, cleanup, report"
+   echo "Usage: $1 -p [REQUIRED] pipeline mode options"
+   echo -e "\t-m options: init, all, analysis, cleanup, report"
    echo "Usage: $2 -n [REQUIRED] project_id"
    echo -e "\t-n project id"
    echo "Usage: $3 -r [OPTIONAL] resume_run"
@@ -90,7 +90,9 @@ tmp_dir=$output_dir/tmp
 analysis_dir=$output_dir/analysis
 
 fasta_dir=$analysis_dir/fasta
+
 intermed_dir=$analysis_dir/intermed
+intermed_sample_dir=$intermed_dir/sample_level_data/assembly
 
 #set log files
 pipeline_log=$log_dir/pipeline_log.txt
@@ -112,15 +114,15 @@ if [[ "$pipeline" == "init" ]]; then
         if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
 
         ##parent
-        dir_list=(logs fastq phoenix dryad qc tmp analysis)
+        dir_list=(logs fastq pipeline qc tmp analysis)
         for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi; done
 
         ## logs
 	dir_list=(samplesheets pipeline_logs)
         for pd in "${dir_list[@]}"; do if [[ ! -d $log_dir/$pd ]]; then mkdir -p $log_dir/$pd; fi; done
 
-	##qc
-        dir_list=(qcreport)
+        ## qc
+        dir_list=(sample_level_data)
         for pd in "${dir_list[@]}"; do if [[ ! -d $qc_dir/$pd ]]; then mkdir -p $qc_dir/$pd; fi; done
 
         ##tmp
@@ -130,6 +132,12 @@ if [[ "$pipeline" == "init" ]]; then
         ##analysis
         dir_list=(fasta intermed sample_reports)
         for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi; done
+
+        ## intermed
+        dir_list=(sample_level_data)
+        for pd in "${dir_list[@]}"; do if [[ ! -d $intermed_dir/$pd ]]; then mkdir -p $intermed_dir/$pd; fi; done
+        dir_list=(ASSEMBLY AMRFinder ANI MLST)
+        for pd in "${dir_list[@]}"; do if [[ ! -d $intermed_sample_dir/$pd ]]; then mkdir -p $intermed_sample_dir/$pd; fi; done
 
         ##make files
         touch $pipeline_log
@@ -147,13 +155,13 @@ if [[ "$pipeline" == "init" ]]; then
         echo -e "Configs are ready to be edited:\n${log_dir}"
         echo "*** INITIALIZATION COMPLETE ***"
         echo
-elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "phoenix" ]]; then
+elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "analysis" ]]; then
 
         #############################################################################################
-        # Run PHOENIX pipeline
+        # Run pipeline
         #############################################################################################
         message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- STARTING PHOENIX PIPELINE ---"
+        message_cmd_log "--- STARTING ANALYSIS ---"
 
         # check initialization was completed
         check_initialization
@@ -162,7 +170,7 @@ elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "phoenix" ]]; then
         date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
 
         # run pipelien
-        bash scripts/phoenix.sh \
+        bash scripts/analysis.sh \
                 "${output_dir}" \
                 "${project_name_full}" \
                 "${pipeline_config}" \
@@ -172,49 +180,26 @@ elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "phoenix" ]]; then
                 "${resume_flag}" \
                 "${testing_flag}"
 
-elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "dryad" ]]; then
-
-        #############################################################################################
-        # Run DRYAD pipeline
-        #############################################################################################
-        message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- STARTING DRYAD PIPELINE ---"
-
-        # check initialization was completed
-        check_initialization
-
-        # Eval YAML args
-        date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
-
-        # run pipelien
-        bash scripts/dryad.sh \
-                "${output_dir}" \
-                "${project_name_full}" \
-                "${pipeline_config}" \
-                "${multiqc_config}" \
-                "${date_stamp}" \
-                "${pipeline_log}" \
-                "${resume_flag}" \
-                "${testing_flag}"
-                
 elif [[ "$pipeline" == "cleanup" ]]; then
 
         #############################################################################################
-        # Run PHOENIX pipeline
+        # Run cleanup
         #############################################################################################
         message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- Cleanup of PIPELINE ---"
+        message_cmd_log "--- STARTING CLEANUP ---"
 
         bash scripts/cleanup.sh \
-                "${output_dir}"
+                "${output_dir}" \
+                "${project_name_full}" \
+                "${pipeline_config}"
 
 elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "report" ]]; then
 
         #############################################################################################
-        # Run PHOENIX pipeline
+        # Run reporting
         #############################################################################################
         message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- PIPELINE REPORTING ---"
+        message_cmd_log "--- STARTING REPORTING ---"
 
         bash scripts/reporting.sh \
                 "${output_dir}" \
