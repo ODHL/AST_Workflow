@@ -113,14 +113,14 @@ sort $report_dir/tmp_core_genome.tree | uniq > $report_dir/core_genome.tree
 sort $report_dir/tmp_core_genome_statistics.txt | uniq > $report_dir/core_genome_statistics.txt
 
 # run basic report
+## includes: QC, SUMMARY | HEATMAP, TREE
 if [[ $flag_basic == "Y" ]]; then
     # move files
     ## project files
     cp $manifest_csv $process_dir_files/manifest.csv
-    cp $predictions_tsv $process_dir_files/predictions.csv
-    cp $report_dir/snp_distance_matrix.tsv $process_dir_files
-    cp $report_dir/core_genome.tree $process_dir_files
-    cp $report_dir/core_genome_statistics.txt $process_dir_files
+    cp $report_dir/snp_distance_matrix.tsv $process_dir_files # will create heatmap
+    cp $report_dir/core_genome.tree $process_dir_files # will create tree
+    cp $report_dir/core_genome_statistics.txt $process_dir_files # will create tree
     ## scripts files
     cp $script_dir/render_report.R $process_dir_files
     sudo rm -f $ar_generator_dir/*ar-report.html
@@ -129,7 +129,36 @@ if [[ $flag_basic == "Y" ]]; then
 
     # run report
     # inputs: date \ name \ manifest file \ ar_config file \ 
-    echo "---Running report"
+    echo "---Running NOVEL report"
+
+    # prep report
+    echo
+    echo "cd ../mnt/ar_rep; ./render_report.R $today 'Dr. Samantha Chill' \
+    processing_files/manifest.csv processing_files/ar_report_config.yaml processing_output/ \
+    --snpmatrix processing_files/snp_distance_matrix.tsv --tree processing_files/core_genome.tree \
+    --cgstats processing_files/core_genome_statistics.txt"
+    echo
+
+    # run docker
+    cd ~
+    docker run -it --mount type=bind,source="$(pwd)"/tools/ar_report_generator/,target=/mnt/ar_rep quay.io/wslh-bioinformatics/ar-report
+elif [[ $flag_oubreak == "Y" ]]; then
+    # move files
+    ## project files
+    cp $manifest_csv $process_dir_files/manifest.csv
+    cp $predictions_tsv $process_dir_files/predictions.csv # will create gene summary
+    cp $report_dir/snp_distance_matrix.tsv $process_dir_files # will create heatmap
+    cp $report_dir/core_genome.tree $process_dir_files # will create tree
+    cp $report_dir/core_genome_statistics.txt $process_dir_files # will create tree
+    ## scripts files
+    cp $script_dir/render_report.R $process_dir_files
+    sudo rm -f $ar_generator_dir/*ar-report.html
+    cp $script_dir/ar_report_generator_html.Rmd $ar_generator_dir
+    cp $assets_dir/ar_report_config.yaml $process_dir_files
+
+    # run report
+    # inputs: date \ name \ manifest file \ ar_config file \ 
+    echo "---Running OUTBREAK report"
 
     # prep report
     echo
