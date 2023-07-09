@@ -21,7 +21,17 @@ process FASTP_SINGLES {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    zcat ${reads[0]} ${reads[1]} > ${prefix}.cat_singles.fastq
+    r1_size=`zcat ${reads[0]} | wc -l`
+    r2_size=`zcat ${reads[1]} | wc -l`
+
+    if [[ \$r1_size -gt 0 ]] & [[ \$r2_size -gt 0 ]]; then
+        zcat ${reads[0]} ${reads[1]} > ${prefix}.cat_singles.fastq
+    elif [[ \$r1_size -gt 0 ]]; then
+        cp ${reads[0]} ${prefix}.cat_singles.fastq
+    else
+        cp ${reads[1]} ${prefix}.cat_singles.fastq
+    fi
+
     gzip ${prefix}.cat_singles.fastq
     fastp \\
         --in1 ${prefix}.cat_singles.fastq.gz \\

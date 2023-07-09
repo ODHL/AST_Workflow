@@ -78,6 +78,9 @@ h2::after {
 ```{r, echo=FALSE, fig.align='left',out.height='100px',out.extra="style='margin:20px'"}
 knitr::include_graphics(config$logo)
 ```
+```{r, echo=FALSE, fig.align='right',out.height='100px',out.extra="style='margin:20px'"}
+knitr::include_graphics(config$logo2)
+```
 </div>
 
 ```{r setup, include=FALSE}
@@ -114,27 +117,36 @@ pander(headerDF)
 ```
 </center>
 
-## SUMMARY
-
+## SAMPLE INFO  {.tabset}
 `r summaryTEXT`
 
-## SAMPLES
+### QC {.tabset}
 <center>
-```{r samples}
-
-# create table
-colnames(sampleDF) <- c("Lab ID", "Isolate Collection Date", "Local ID", "Species ID", "Specimen Source", "MLST", "Resistance Genes", "Comments","Tree Group")
-# plot table
-kbl(sampleDF[,1:8]) %>%
+```{r qc}
+# https://github.com/CDCgov/phoenix/wiki/Pipeline-Overview#pipeline-qc-checks
+kbl(sampleDF[,c(1:3,8:ncol(sampleDF))]) %>%
   kable_styling(bootstrap_options = c("hover", "condensed", "responsive"),
   fixed_thead = T,
   font_size = 14)
 ```
 </center>
-`r if(exists('snpData') | exists('treepath')){"## RELATEDNESS"}`
 
-`r if(exists('snpData')){"### HEATMAP"}`
-`r if(exists('snpData')){config$heatmap.text}`
+### SUMMARY {.tabset}
+
+<center>
+```{r samples}
+# plot table
+kbl(sampleDF[,1:6]) %>%
+  kable_styling(bootstrap_options = c("hover", "condensed", "responsive"),
+  fixed_thead = T,
+  font_size = 14)
+```
+</center>
+
+## RELATEDNESS {.tabset}
+
+### HEATMAP {.tabset}
+`r config$heatmap.text`
 <center>
 ```{r heatmap}
 if(exists('snpData') && config$show.snp==TRUE){
@@ -157,14 +169,13 @@ if(exists('snpData') && config$show.snp==FALSE){
 
 ```
 </center>
-`r if(exists('snpData')){"***"}`
-
-`r if(exists('treepath')){"### PHYLOGENETIC TREE"}`
-`r if(exists('treepath')){config$tree.text}`
+***
+### PHYLOGENETIC TREE {.tabset}
+`r config$tree.text`
 `r if(exists('treepath') & exists('cgstats')){paste("Core Genes Identified: ",cgstats[cgstats$V1 == 'Core genes',3],'\n')}`
 `r if(exists('treepath') & exists('cgstats')){paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])}`
-<center>
 
+<center>
 ```{r tree, message=FALSE}
 if(exists('treepath')){
   set.seed(42)
@@ -230,50 +241,82 @@ if(exists('treepath')){
 }
 ```
 </center>
-`r if(exists('treepath')){"***"}`
 
-`r if(exists('ar_summary')){"## AR GENE SUMMARY"}`
-`r if(exists('ar_summary')){config$ar_gene_summary.text}`
+***
+### AR GENE SUMMARY {.tabset}
+`r config$ar_gene_summary.text`
 <center>
 ```{r ar_table}
 if(exists('ar_summary')){
-  ar_summary <- ar_summary[order(ar_summary$Sample),]
-  row.names(ar_summary) <- NULL
-  # plot table
-  kbl(ar_summary) %>%
-    kable_styling(bootstrap_options = c("hover", "condensed", "responsive"),
-    fixed_thead = T,
-    font_size = 14) %>%
-    pack_rows(index=table(ar_summary$Sample))
+  
+  # determine gene consensus at 50%
+  number_of_samples=round(length(unique(ar_summary$Sample))*.5+.5,0)
+  output_df=data.frame()
+  for (geneID in unique(ar_summary$Gene)){
+    tmp_df=subset(ar_summary,Gene==geneID)
+    if (nrow(tmp_df)==number_of_samples){
+      if (nrow(output_df)==0){
+        output_df=tmp_df
+      } else{
+        output_df=rbind(tmp_df,output_df)
+      }
+    }
+  }
+  # strip rownames, order by gene name
+  row.names(output_df) <- NULL
+  output_df <- output_df[order(output_df$Gene),]
+  
+  # if there are consensus genes then print table
+  if (nrow(output_df)==0){
+    print("There are no genes with consensus between at least 50% of samples")
+  } else{
+    kbl(output_df[,c(1,3,4)])  %>%
+      kable_styling(bootstrap_options = c("hover", "condensed", "responsive"),
+      fixed_thead = T,
+      font_size = 14) %>%
+      pack_rows(index=table(output_df$Gene))
+  }
 }
 ```
 </center>
-`r if(exists('matrixpng')){"## PANGENOME ANALYSES"}`
+
+`r if(exists('matrixpng')){"## PANGENOME ANALYSES {.tabset}"}`
 `r if(exists('matrixpng')){config$matrix.text}`
 
-```{r pangenome}
-knitr::include_graphics(matrixpng)
-knitr::include_graphics(piepng)
-knitr::include_graphics(freqpng)
-```
-
-`r if(exists('optionalData')){"## ADDITIONAL ANALYSES"}`
-`r if(exists('optionalData')){config$optionaldata.text}`
+`r if(exists('piepng')){"### PANGENOME (PRESENT/ABSENCE) {.tabset}"}`
+`r if(exists('piepng')){config$pangenome.pa}`
 <center>
-```{r additional tables, results='asis'}
-if(exists('optionalData')){
-  for(i in 1:length(optionalData)){
-    print(kbl(optionalData[[i]]) %>%
-      kable_styling(bootstrap_options = c("hover", "condensed", "responsive"),
-      fixed_thead = T,
-      font_size = 14))
-    cat('\n')
-  }
+```{r pangenome1}
+if(exists('matrixpng')){
+  knitr::include_graphics(matrixpng)
+}
+```
+</center>
+
+`r if(exists('piepng')){"### PANGENOME (PIE) {.tabset}"}`
+`r if(exists('piepng')){config$pangenome.pie}`
+
+<center>
+```{r pangenome2}
+if(exists('piepng')){
+  knitr::include_graphics(piepng)
+}
+```
+</center>
+
+`r if(exists('freqpng')){"### PANGENOME (FREQUENCY) {.tabset}"}`
+`r if(exists('freqpng')){config$pangenome.frequency}`
+
+<center>
+```{r pangenome3}
+if(exists('piepng')){
+  knitr::include_graphics(freqpng)
 }
 ```
 </center>
 
 ## METHODS
 `r methodsTEXT`
+
 ## DISCLAIMER
 `r disclaimerTEXT`

@@ -45,6 +45,6 @@ process KRAKEN2_KRAKEN2 {
         $reads
 
     $compress_reads_command
-    cp ~/workflows/AST_Workflow/config/kraken2.yaml versions.yml
+    cp ~/workflows/AST_Workflow/conf/kraken2.yaml versions.yml
     """
 }

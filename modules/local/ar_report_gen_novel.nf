@@ -10,10 +10,6 @@ process AR_REPORT {
     path(snpmatrix)                 // CFSAN.out.distmatrix
     path(tree)                      // TREE.out.genome_tree
     path(core_genome)               // ROARY.out.core_stats
-    path(pangenome_frequency)
-    path(pangenome_matrix)
-    path(pangenome_pie)
-    path(wgs_local)                 //wgs_db_local.tsv
 
     output:
     path "*.ar-report.html"                                      , emit: ar_html
@@ -29,14 +25,10 @@ process AR_REPORT {
     # Prep sample manifest
     tail -n +2 $final_report > report.tsv
     sed -i "s/,/;/g" report.tsv
-    sed -i "s/\t/,/g" report.tsv
-
-    # join report with WGS ID manifest
-    join <(sort report.tsv) <(sort $wgs_local) -t $',' >> joined_report.tsv
 
     # final manifest
-    echo -e ""Lab ID"",""WGS ID"",""Date Collected"",""Organism"",""Specimen Source"",""Resistance Genes"",""Comments"",""Estimated_Coverage"",""Taxa_Confidence"",""Auto_QC_Outcome"",""Auto_QC_Failure_Reason"" > ar_report_manifest.csv
-    awk -F"," '{print \$1",\$2,,"\$10",,"\$19","\$5","\$11","\$3","\$24","}' joined_report.tsv >> ar_report_manifest.csv
+    echo -e ""Lab ID"",""WGS ID"",""Date Collected"",""Organism"",""Specimen Source"",""Resistance Genes"",""Comments"" > ar_report_manifest.csv
+    awk -F"\t" '{print \$1",,,"\$9",,"\$18","}' report.tsv >> ar_report_manifest.csv
 
     # Set date
     today=`date +%Y%m%d`
@@ -53,7 +45,6 @@ process AR_REPORT {
     --artable ar_predictions.tsv \\
     --freq $PWD/${pangenome_frequency} \\
     --matrix $PWD/${pangenome_matrix} \\
-    --pie $PWD/${pangenome_pie} \\
-    --reportType "standard"
+    --pie $PWD/${pangenome_pie}
     """
 }
