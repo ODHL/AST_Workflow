@@ -1,142 +1,221 @@
+# bash bin/core_reporting_new.sh /home/ubuntu/output/ast_run1 BASIC
+
 #########################################################
 # ARGS
 #########################################################
-output_dir=$1
-project_name_full=$2
-pipeline_config=$3
-
-##########################################################
-# Eval, source
-#########################################################
-source $(dirname "$0")/functions.sh
-eval $(parse_yaml ${pipeline_config} "config_")
+final_dir=$1
+report_type=$2
 
 ##########################################################
 # Set flags
 #########################################################
-flag_prep="Y"
-flag_ar="N"
-flag_qc="N"
+flag_basic="N"
+flag_outbreak="N"
+flag_novel="N"
+flag_regional="N"
+flag_time="N"
 
-#########################################################
-# Set dirs, files, args
-#########################################################
-# set variables
-project_name_full=$(echo $project_id | sed 's:/*$::')
-project_name=$(echo $project_id | cut -f1 -d "_" | cut -f1 -d " ")
-
-# set dirs
-log_dir=$output_dir/logs
-pipeline_log="$log_dir/pipeline_log.txt"
-
-qc_dir=$output_dir/qc
-tmp_dir=$output_dir/tmp
-
-analysis_dir=$output_dir/analysis
-intermed_dir=$analysis_dir/intermed
-reports_dir=$analysis_dir/reports
-pipeline_dir=$output_dir/phoenix
-
-# set files
-sample_manifest="$log_dir/ar_report_manifest.txt"
-snpmatrix="$intermed_dir/snp_distance_matrix.tsv"
-tree="$intermed_dir/core_genome.tree"
-cgstats="$intermed_dir/core_genome_statistics.txt"
-artable="$intermed_dir/ar_predictions.tsv"
-
-# remove old files
-file_list=(sample_manifest snpmatrix tree cgstats artable)
-for f in "${file_list[@]}"; do if [[ -f $f ]]; then sudo rm $f; fi; done
-
-#############################################################################################
-# LOG INFO TO CONFIG
-#############################################################################################
-message_cmd_log "------------------------------------------------------------------------"
-message_cmd_log "--- RUNNING REPORT ---"
-echo "---Starting time: `date`" >> $pipeline_log
-echo "---Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
-
-#############################################################################################
-# Create final reports
-#############################################################################################
-# prep each of the report inputs
-if [[ $flag_prep == "Y" ]]; then
-    echo "--PREPPING Report"
-    # determine number of batches
-	batch_count=`ls $log_dir/batch* | wc -l`
-	batch_min=1
-
-    if [[ -f $sample_manifest ]]; then rm $sample_manifest; fi
-    echo -e "SampleID\tSpeciesID\tMLST\tResistanceGenes" > $sample_manifest     
-    echo -e "SampleID\tGene\tCoverage\tIdentity" > $artable
-
-	#for each batch
-	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
-        echo "--processing batch $batch_id"
-        # set output batch dir
-        pipeline_batch_dir=$pipeline_dir/batch_$batch_id
-        tmp_batch_dir=$tmp_dir/batch_$batch_id
-        if [[ ! -d $tmp_batch_dir ]]; then mkdir $tmp_batch_dir; fi
-        artable_int=$intermed_dir/amr_genes_$batch_id.tsv
-        if [[ -f $artable_int ]]; then sudo rm $artable_int; fi
-        echo -e "Protein_identifier\tContig_id\tStart\tStop\tStrand\tGene_symbol\tSequence_name\tScope\tElement_type\tElement_subtype\tClass\tSubclass\tMethod\tTarget_length\tReference_sequence_length\t%_Coverage_of_reference_sequence\t%_Identity_to_reference_sequence\tAlignment_length\tAccession_of_closest_sequence\tName_of_closest_sequence\tHMM_id\tHMM_description" > $artable_int
-
-        #############################################
-        # copy snpmatrix
-        cp $pipeline_batch_dir/report/snp_distance_matrix.tsv $intermed_dir/snp_distance_matrix_batch_$batch_id.tsv
-
-        ## push to output
-        cat $intermed_dir/snp_distance_matrix_batch_$batch_id.tsv >> $snpmatrix
-
-        # ##############################################
-        # copy tree
-        cp $pipeline_batch_dir/report/snp.tree $intermed_dir/core_genome_batch_$batch_id.tree
-
-        ## push to output
-        cat $intermed_dir/core_genome_batch_$batch_id.tree >> $tree
-
-        # ##############################################
-        # copy cgstats
-        cp $pipeline_batch_dir/report/core_genome_statistics.txt $intermed_dir/core_genome_statistics_$batch_id.txt
-
-        ## push to output
-        cat $intermed_dir/core_genome_statistics_$batch_id.txt >> $cgstats
-
-        ##############################################
-        # prep artable
-        tail -n +2 $pipeline_batch_dir/Analysis_Output_Report.tsv > $tmp_batch_dir/artable.tsv
-        sample_list=`awk -F"\t" '{print $1}' $tmp_batch_dir/artable.tsv`
-
-        for sid in ${sample_list[@]}; do
-            echo "---processing $sid"
-            tail -n +2 $pipeline_batch_dir/$sid/AMRFinder/${sid}_all_genes.tsv >> $artable_int
-            awk -F"\t" -v sid=$sid '{print sid"\t"$6"\t"$16"\t"$17}' $artable_int >> $artable
-        done
-        ##############################################
-        # prep samplemanifest
-        tail -n +2 $pipeline_batch_dir/Analysis_Output_Report.tsv > $tmp_batch_dir/report.tsv
-        awk -F"\t" '{print $1"\t"$9"\t"$14"\t"$18}' $tmp_batch_dir/report.tsv >> $sample_manifest
-        
-        ##############################################
-        # move required files to tmp report directory
-        sudo rm -r $tmp_report_dir/*
-        cp $snpmatrix $tmp_report_dir
-        cp $tree $tmp_report_dir
-        cp $cgstats $tmp_report_dir
-        cp $artable $tmp_report_dir
-        cp $sample_manifest $tmp_report_dir
-
-    done
+if [[ $report_type == "BASIC" ]]; then
+    flag_basic="Y"
+elif [[ $report_type == "OUTBREAK" ]]; then
+    flag_outbreak="Y"
+elif [[ $report_type == "NOVEL" ]]; then
+    flag_novel="Y"
+elif [[ $report_type == "REGIONAL" ]]; then
+    flag_regional="Y"
+elif [[ $report_type == "TIME" ]]; then
+    flag_time="Y"
+else
+    echo "Check report type selected: $report_type"
+    echo "Must be BASIC OUTBREAK NOVEL REGIONAL TIME"
+    exit
 fi
 
-# run docker with ar-report generator
-if [[ $flag_ar == "Y" ]]; then
-    echo "-Running report"
+# Set date
+today=`date +%Y%m%d`
+
+# set project file
+project_file="$final_dir/project_list.tsv"
+
+# set script dir
+script_dir="/home/ubuntu/workflows/AST_Workflow/bin"
+assets_dir="/home/ubuntu/workflows/AST_Workflow/assets"
+
+# set processing dir; output
+ar_generator_dir="/home/ubuntu/tools/ar_report_generator"
+process_dir_files="/home/ubuntu/tools/ar_report_generator/processing_files"
+if [[ -d $process_dir_files ]]; then sudo rm -r $process_dir_files; fi
+process_dir_out="/home/ubuntu/tools/ar_report_generator/processing_output"
+if [[ -d $process_dir_out ]]; then sudo rm -r $process_dir_out; fi
+mkdir $process_dir_files; mkdir $process_dir_out
+
+# set wgs
+wgs_dir="$assets_dir/wgs_db"
+wgs_ids="$wgs_dir/wgs_db_master.csv"
+
+##########################################################
+# Run each project
+#########################################################
+# read in project list
+IFS=$'\n' read -d '' -r -a project_list < $project_file
+
+# set report
+report_dir="$final_dir/${today}_${report_type}"
+if [[ ! -d $report_dir ]]; then mkdir -p $report_dir; else rm -r $report_dir;  mkdir -p $report_dir; fi
+
+# create reports
+predictions_tsv="$report_dir/ar_predictions.csv"
+manifest_csv="$report_dir/final.tsv"
+
+wgs_tsv="$report_dir/wgs_manifest.tsv"
+wgs_tmp="$report_dir/wgs_tmp.tsv"
+prediction_ids_tsv="$report_dir/prediction_ids.tsv"
+
+# prep final files
+echo -e "Sample \tGene \tCoverage \tIdentity" > $predictions_tsv
+echo -e ""Lab ID"",""WGS ID"",""Project ID"",""Date Collected"",""Organism"",""Specimen Source"",""Resistance Genes"",""Estimated_Coverage"",""Taxa_Confidence"",""Auto_QC_Outcome"",""Auto_QC_Failure_Reason"",""Comments"" > $manifest_csv
+
+# create files for basic report
+for proj_dir in ${project_list[@]}; do
+    output_dir="/home/ubuntu/$proj_dir"
+
+    echo "--Processing $output_dir"
+    
+    # check files exist
+    amr_reports="$output_dir/*/AMRFinder/*_all_genes.tsv"
+    phoenix_report="$output_dir/Phoenix_Output_Report.tsv"
+    snpmatrix="$output_dir/DRYAD/snp_distance_matrix.tsv"
+    tree="$output_dir/TREE.out.genome_tree"
+
+    file_list=($amr_reports $phoenix_report $snpmatrix $tree)
+    for f in ${file_list[@]}; do
+        if [[ ! -f $snpmatrix ]]; then
+            echo "Missing FILE required for basic report: $snpmatrix"
+            exit
+        fi
+    done
+
+    # create predictions file
+    awk '{print FILENAME"\t" $0}' $amr_reports | \
+    awk -F"\t" '{print $1"\t"$7"\t"$17"\t"$18}' | sed -s "s/_all_genes.tsv//g" > ${predictions_tsv}tmp
+    ## pull the sampleID from the file name
+    awk '{sub(/.*\//,"",$1)}1' ${predictions_tsv}tmp > ${predictions_tsv}tmp2
+    ## push to final file
+    cat ${predictions_tsv}tmp2 | grep -v "_Coverage_of_reference_sequence" >> $predictions_tsv
+    sed -i "s/ /,/g" $predictions_tsv
+    sed -i "s/\t//g" $predictions_tsv
+
+    # Prep wgs manifest
+    tail -n +2 $phoenix_report > ${wgs_tsv}
+    sed -i "s/,/;/g" ${wgs_tsv}
+    sed -i "s/\t/,/g" ${wgs_tsv}
+
+    # final manifest
+    awk -F"," '{print $2","$1","$3}' $wgs_ids > $wgs_tmp
+    join <(sort $wgs_tsv) <(sort $wgs_tmp) -t $',' > $prediction_ids_tsv
+    awk -F"," '{print $1","$24","$25",,"$9",,"$19","$4","$10","$2","$23","}' $prediction_ids_tsv >> $manifest_csv
+done
+
+# move files depending on reports
+touch $report_dir/snp_distance_matrix.tsv
+touch $report_dir/core_genome.tree
+touch $report_dir/core_genome_statistics.txt
+
+for proj_dir in ${project_list[@]}; do
+    output_dir="/home/ubuntu/$proj_dir"
+
+    cat $output_dir/DRYAD/snp_distance_matrix.tsv >> $report_dir/tmp_snp_distance_matrix.tsv
+    cat $output_dir/DRYAD/core_genome.tree >> $report_dir/tmp_core_genome.tree
+    cat $output_dir/DRYAD/core_genome_statistics.txt >> $report_dir/tmp_core_genome_statistics.txt
+done
+
+sort $report_dir/tmp_snp_distance_matrix.tsv | uniq > $report_dir/snp_distance_matrix.tsv
+sort $report_dir/tmp_core_genome.tree | uniq > $report_dir/core_genome.tree
+sort $report_dir/tmp_core_genome_statistics.txt | uniq > $report_dir/core_genome_statistics.txt
+
+# run basic report
+## includes: QC, SUMMARY | HEATMAP, TREE
+if [[ $flag_basic == "Y" ]]; then
+    # move files
+    ## project files
+    cp $manifest_csv $process_dir_files/manifest.csv
+    cp $report_dir/snp_distance_matrix.tsv $process_dir_files # will create heatmap
+    cp $report_dir/core_genome.tree $process_dir_files # will create tree
+    cp $report_dir/core_genome_statistics.txt $process_dir_files # will create tree
+    ## scripts files
+    cp $script_dir/render_report.R $process_dir_files
+    sudo rm -f $ar_generator_dir/*ar-report.html
+    cp $script_dir/ar_report_generator_html.Rmd $ar_generator_dir
+    cp $assets_dir/ar_report_config.yaml $process_dir_files
+
+    # run report
+    # inputs: date \ name \ manifest file \ ar_config file \ 
+    echo "---Running NOVEL report"
+
+    # prep report
+    echo
+    echo "cd ../mnt/ar_rep; ./render_report.R $today 'Dr. Samantha Chill' \
+    processing_files/manifest.csv processing_files/ar_report_config.yaml processing_output/ \
+    --snpmatrix processing_files/snp_distance_matrix.tsv --tree processing_files/core_genome.tree \
+    --cgstats processing_files/core_genome_statistics.txt"
+    echo
+
+    # run docker
+    cd ~
+    docker run -it --mount type=bind,source="$(pwd)"/tools/ar_report_generator/,target=/mnt/ar_rep quay.io/wslh-bioinformatics/ar-report
+elif [[ $flag_oubreak == "Y" ]]; then
+    # move files
+    ## project files
+    cp $manifest_csv $process_dir_files/manifest.csv
+    cp $predictions_tsv $process_dir_files/predictions.csv # will create gene summary
+    cp $report_dir/snp_distance_matrix.tsv $process_dir_files # will create heatmap
+    cp $report_dir/core_genome.tree $process_dir_files # will create tree
+    cp $report_dir/core_genome_statistics.txt $process_dir_files # will create tree
+    ## scripts files
+    cp $script_dir/render_report.R $process_dir_files
+    sudo rm -f $ar_generator_dir/*ar-report.html
+    cp $script_dir/ar_report_generator_html.Rmd $ar_generator_dir
+    cp $assets_dir/ar_report_config.yaml $process_dir_files
+
+    # run report
+    # inputs: date \ name \ manifest file \ ar_config file \ 
+    echo "---Running OUTBREAK report"
+
+    # prep report
+    echo
+    echo "cd ../mnt/ar_rep; ./render_report.R $today 'Dr. Samantha Chill' \
+    processing_files/manifest.csv processing_files/ar_report_config.yaml processing_output/ \
+    --snpmatrix processing_files/snp_distance_matrix.tsv --tree processing_files/core_genome.tree \
+    --cgstats processing_files/core_genome_statistics.txt --artable processing_files/predictions.csv"
+    echo
+
     # run docker
     cd ~
     docker run -it --mount type=bind,source="$(pwd)"/tools/ar_report_generator/,target=/mnt/ar_rep quay.io/wslh-bioinformatics/ar-report
     
-    # # run report
+fi
+
+# # run basic report
+# if [[ $flag_complete == "Y" ]]; then
+#     # run report
+#     # inputs: date \ name \ manifest file \ ar_config file \ 
+#     Rscript /home/ubuntu/workflows/AST_Workflow/bin/render_report.R \\
+#     \$today \\
+#     'Dr. Samantha Chill' \\
+#     $manifest_csv \\
+#     ${ar_config} \\
+#     $PWD/ \\
+#     --snpmatrix ${snpmatrix} \\
+#     --tree $PWD/${tree} \\
+#     --cgstats ${core_genome} \\
+#     --artable ar_predictions.tsv \\
+#     --freq $PWD/${pangenome_frequency} \\
+#     --matrix $PWD/${pangenome_matrix} \\
+#     --pie $PWD/${pangenome_pie} \\
+#     --reportType "standard"
+# fi
+
+# # run report
     # cd ../mnt/ar_report_generator
     # ./render_report.R \
     #     --projectname $project_name_full \
@@ -148,29 +227,3 @@ if [[ $flag_ar == "Y" ]]; then
     #     --tree $tmp_dir/core_genome.tree \
     #     --cgstats $tmp_dir/core_genome_statistics.txt \
     #     --artable $tmp_dir/ar_predictions.tsv
-
-    cd ../mnt/ar_rep
-    ./render_report.R \
-        'test_dryad_github' \
-        'Dr. Samantha Chill' \
-        /mnt/ar_rep/report/ar_report_manifest.tsv \
-        ar_report_config.yaml \
-        /mnt/ar_rep/report \
-        --snpmatrix /mnt/ar_rep/report/snp_distance_matrix.tsv \
-        --cgstats /mnt/ar_rep/report/core_genome_statistics.txt \
-        --artable /mnt/ar_rep/report/ar_predictions.tsv \
-        --tree /mnt/ar_rep/report/core_genome.tree
-
-    # end docker
-    docker stop
-fi
-
-#create fragment plot
-if [[ $flag_qc == "N" ]]; then
-    python scripts/fragment_plots.py $merged_fragment $fragement_plot
-fi
-
-# echo "Ending time: `date`" >> $pipeline_log
-# echo "Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
-# message_cmd_log "--- COMPLETE REPORT ---"
-# message_cmd_log "------------------------------------------------------------------------"

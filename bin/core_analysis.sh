@@ -154,8 +154,8 @@ if [[ $flag_batch == "Y" ]]; then
 	cat tmp.txt | uniq > $sample_id_file
 	rm tmp.txt
 
-    	#read in text file with all project id's
-    	IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
+    #read in text file with all project id's
+	IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
 	
 	for sample_id in ${sample_list[@]}; do
         

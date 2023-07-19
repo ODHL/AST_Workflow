@@ -287,16 +287,16 @@ workflow ANALYSIS_RUN {
             PROKKA.out.gffonly.collect(), 
         )
 
-        // Generate core genome tree
-        TREE (
-            ROARY.out.aln
-        )
+        // // Generate core genome tree
+        // TREE (
+        //     ROARY.out.aln
+        // )
 
-        // Generate ROARY plots
-        ROARY_PLOTS (
-            TREE.out.genome_tree,
-            ROARY.out.present_absence
-        )
+        // // Generate ROARY plots
+        // ROARY_PLOTS (
+        //     TREE.out.genome_tree,
+        //     ROARY.out.present_absence
+        // )
 
         // First remove metadata from tuple, then generate SNP dist matrix
         CFSAN (
