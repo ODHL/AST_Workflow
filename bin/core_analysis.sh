@@ -16,11 +16,31 @@ flag_testing=$8
 if [[ $resume_flag == "Y" ]]; then
 	flag_download="N"
 	flag_batch="N"
+	flag_ID="N"
 	flag_analysis="N"
 	flag_resume="Y"
+elif [[ $resume_flag == "BATCHONLY" ]]; then
+	flag_download="Y"
+	flag_batch="Y"
+	flag_ID="N"
+	flag_analysis="N"
+	flag_resume="N"
+elif [[ $resume_flag == "ANALYSISONLY" ]]; then
+	flag_download="N"
+	flag_batch="N"
+	flag_ID="N"
+	flag_analysis="Y"
+	flag_resume="N"
+elif [[ $resume_flag == "IDONLY" ]]; then
+	flag_download="N"
+	flag_batch="N"
+	flag_ID="Y"
+	flag_analysis="N"
+	flag_resume="N"
 else
 	flag_download="Y"
 	flag_batch="Y"
+	flag_ID="N"
 	flag_analysis="Y"
 	flag_resume="N"
 fi
@@ -102,6 +122,7 @@ if [[ $flag_download == "Y" ]]; then
 	# display all available ID's to re-run project	
 	if [ -z "$project_id" ] && [ "$partial_flag" != "Y" ]; then
 		echo "The project id was not found from $project_name_full. Review available project names below and try again"
+		$config_basespace_cmd list projects
 		exit
 	fi
 
@@ -129,10 +150,12 @@ if [[ $flag_batch == "Y" ]]; then
 	echo "--Creating batch files"
 	
 	#create sample_id file - grab all files in dir, split by _, exclude noro- file names
-	ls $tmp_dir | grep "ds"| cut -f1 -d "-" | grep -v "noro.*" > $sample_id_file
+	ls $tmp_dir | grep "ds"| cut -f1 -d "-" | grep -v "noro.*" > tmp.txt
+	cat tmp.txt | uniq > $sample_id_file
+	rm tmp.txt
 
-    	#read in text file with all project id's
-    	IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
+    #read in text file with all project id's
+	IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
 	
 	for sample_id in ${sample_list[@]}; do
         
@@ -202,6 +225,10 @@ if [[ $flag_batch == "Y" ]]; then
 		# replace update manifests and cleanup
 		mv $log_dir/save/* $log_dir
 		sudo rm -r $log_dir/save
+
+		# set samples and batch
+		sample_count=4
+		batch_count=1
 	fi
 
 	#log
@@ -210,12 +237,11 @@ if [[ $flag_batch == "Y" ]]; then
 	#merge all batched outputs
 	touch $merged_samples
 	touch $merged_pipeline
-	touch $merged_summary
 	touch $merged_fragment
 fi
 
 #############################################################################################
-# Phoenix Analysis
+# Analysis
 #############################################################################################
 # first pass
 if [[ $flag_analysis == "Y" ]]; then
@@ -297,7 +323,7 @@ if [[ $flag_analysis == "Y" ]]; then
 
 		# run NEXTLFOW
 		pipeline_full_cmd="$analysis_cmd $ODH_version $analysis_cmd_trailing"
-		analysis_cmd_line="$nextflow_cmd run $pipeline_full_cmd --input $samplesheet --kraken2db $config_kraken2_db --outdir $pipeline_batch_dir"
+		analysis_cmd_line="$nextflow_cmd run /home/ubuntu/workflows/AST_Workflow/main.nf $pipeline_full_cmd --input $samplesheet --kraken2db $config_kraken2_db --outdir $pipeline_batch_dir --projectID $project_name_full"
 		echo "$analysis_cmd_line"
 		$analysis_cmd_line
 
@@ -319,8 +345,46 @@ if [[ $flag_resume == "Y" ]]; then
 	work_dir=$fastq_dir/batch_1/3*/work
 
 	# run phoenix
-	pipeline_full_cmd="$analysis_cmd_resume $phoenix_version $analysis_cmd_trailing"
-    analysis_cmd_line="$nextflow_cmd run $pipeline_full_cmd --input $samplesheet --kraken2db $config_kraken2_db -w $work_dir --outdir $pipeline_batch_dir"
+	pipeline_full_cmd="$ODH_version $analysis_cmd_trailing"
+	analysis_cmd_line="$nextflow_cmd run /home/ubuntu/workflows/AST_Workflow/main.nf $analysis_cmd_resume $pipeline_full_cmd --input $samplesheet --kraken2db $config_kraken2_db --outdir $pipeline_batch_dir --projectID $project_name_full"
 	echo "$analysis_cmd_line"
 	$analysis_cmd_line
+fi
+
+#############################################################################################
+# Generate WGS ID
+#############################################################################################
+if [[ $flag_ID == "Y" ]]; then
+	#log
+	message_cmd_log "--Generating WGS ID's:"
+
+	# determine number of batches
+	batch_count=`ls $log_dir/batch* | wc -l`
+	batch_min=1
+
+	#for each batch
+	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
+		
+		# set batch name
+		if [[ "$batch_id" -gt 9 ]]; then batch_name=$batch_id; else batch_name=0${batch_id}; fi
+		
+		#set batch manifest
+		batch_manifest=$log_dir/batch_${batch_name}.txt
+
+		#read text file
+		IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
+
+		#run per sample
+		for sample_id in ${sample_list[@]}; do
+			search_key=`cat $wgs_database | grep $sample_id`
+
+			# if the sample already exists in the database, send an error
+			if [[ $search_key == "" ]]; then
+				echo "The sampleID $sample_id was already found in the database. Review the results and correct"
+				echo $search_key
+			else
+				final_key=`cat $wgs_database | cut -f2 -d"," | cut -f YYYY-GZ-0001`
+			fi
+		done
+	done
 fi

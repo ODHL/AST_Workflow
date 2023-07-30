@@ -72,7 +72,7 @@ include { ROARY                          } from '../modules/local/roary' // Perf
 include { TREE                           } from '../modules/local/core_genome_tree' //Infer ML tree from core genome alignment using IQ-TREE
 include { ROARY_PLOTS                    } from '../modules/local/roary_plots'
 include { CFSAN                          } from '../modules/local/cfsan' // Run CFSAN-SNP Pipeline
-include { AR_REPORT                      } from '../modules/local/ar_report_gen'
+// include { AR_REPORT                      } from '../modules/local/ar_report_gen'
 /*
 ========================================================================================
     IMPORT LOCAL SUBWORKFLOWS
@@ -107,7 +107,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS  } from '../modules/nf-core/modules/custom
 ========================================================================================
 */
 
-workflow PHOENIX_MINI {
+workflow ANALYSIS_RUN_MINI {
     main:
         // Set up versions channel
         ch_versions = Channel.empty() // Used to collect the software versions

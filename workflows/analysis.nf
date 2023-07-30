@@ -72,7 +72,8 @@ include { ROARY                          } from '../modules/local/roary' // Perf
 include { TREE                           } from '../modules/local/core_genome_tree' //Infer ML tree from core genome alignment using IQ-TREE
 include { ROARY_PLOTS                    } from '../modules/local/roary_plots'
 include { CFSAN                          } from '../modules/local/cfsan' // Run CFSAN-SNP Pipeline
-include { AR_REPORT                      } from '../modules/local/ar_report_gen'
+// include { AR_REPORT                      } from '../modules/local/ar_report_gen'
+// include { WGS_ID_GENERATION              } from '../modules/local/wgs_id_generation.nf'
 /*
 ========================================================================================
     IMPORT LOCAL SUBWORKFLOWS
@@ -107,7 +108,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS  } from '../modules/nf-core/modules/custom
 ========================================================================================
 */
 
-workflow PHOENIX_EXTERNAL {
+workflow ANALYSIS_RUN {
     main:
         // Set up versions channel
         ch_versions = Channel.empty() // Used to collect the software versions
@@ -286,16 +287,16 @@ workflow PHOENIX_EXTERNAL {
             PROKKA.out.gffonly.collect(), 
         )
 
-        // Generate core genome tree
-        TREE (
-            ROARY.out.aln
-        )
+        // // Generate core genome tree
+        // TREE (
+        //     ROARY.out.aln
+        // )
 
-        // Generate ROARY plots
-        ROARY_PLOTS (
-            TREE.out.genome_tree,
-            ROARY.out.present_absence
-        )
+        // // Generate ROARY plots
+        // ROARY_PLOTS (
+        //     TREE.out.genome_tree,
+        //     ROARY.out.present_absence
+        // )
 
         // First remove metadata from tuple, then generate SNP dist matrix
         CFSAN (
@@ -392,18 +393,27 @@ workflow PHOENIX_EXTERNAL {
         )
         // ch_versions = ch_versions.mix(GATHER_SUMMARY_LINES.out.versions)
 
-        // Create AR report with the AR generator
-        AR_REPORT (
-            GATHER_SUMMARY_LINES.out.summary_report,
-            AMRFINDERPLUS_RUN.out.report_only.collect(),
-            ch_ar_config,
-            CFSAN.out.distmatrix,
-            TREE.out.genome_tree,
-            ROARY.out.core_stats,
-            ROARY_PLOTS.out.freq,
-            ROARY_PLOTS.out.matrix,
-            ROARY_PLOTS.out.pie
-        )
+        // // Create WGS ID's
+        // WGS_ID_GENERATION(
+        //     GATHER_SUMMARY_LINES.out.summary_report,
+        //     params.wgs_master,
+        //     params.wgs_local,
+        //     params.projectID
+        // )
+
+        // // Create AR report with the AR generator
+        // AR_REPORT (
+        //     GATHER_SUMMARY_LINES.out.summary_report,
+        //     AMRFINDERPLUS_RUN.out.report_only.collect(),
+        //     ch_ar_config,
+        //     CFSAN.out.distmatrix,
+        //     TREE.out.genome_tree,
+        //     ROARY.out.core_stats,
+        //     ROARY_PLOTS.out.freq,
+        //     ROARY_PLOTS.out.matrix,
+        //     ROARY_PLOTS.out.pie,
+        //     WGS_ID_GENERATION.out.wgs_local
+        // )
 
         // Collecting the software versions
         CUSTOM_DUMPSOFTWAREVERSIONS (

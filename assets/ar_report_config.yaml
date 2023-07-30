@@ -16,26 +16,29 @@ sub.title: 'Antimicrobial Resistance Outbreak Report'
 summary.paragraph: |
   This report describes the relatedness between a set of bacterial genomes from a suspected outbreak.
 methods.text: |
-  The figures shown here were generated using sequence data processed with the [ODH AST](https://github.com/ODHL/AST_Workflow) data analysis pipeline. SNPs were called using the [Center for Food Safety and Applied Nutrition (CFSAN) SNP](https://github.com/CFSAN-Biostatistics/snp-pipeline) pipeline. If you have questions about this report please contact [Samantha Chill](samantha.chill@ohio.gov).
+  The figures shown here were generated using sequence data processed with the [ODH AST](https://github.com/ODHL/AST_Workflow) data analysis pipeline. SNPs were called using the [Center for Food Safety and Applied Nutrition (CFSAN) SNP](https://github.com/CFSAN-Biostatistics/snp-pipeline) pipeline. If you have questions about this report please contact [Samantha Chill](samantha.chill@odh.ohio.gov).
 disclaimer.text: |
   The information included in this report should only be used to support infection prevention measures. This report should not be used to guide treatment decisions, nor should it be included in the patient record.
   Whole-genome sequencing analysis is a rapidly evolving technology. Whole-genome sequencing and single nucleotide variant analysis will continue to be adjusted and refined over time due to the varied nature of bacterial genomes, limitations on available reference genomes and continual assessment of the inclusion of mobile genetic elements in this analysis. These results represent the most advanced method currently available for genome comparisons.
 
 ### optional report methodology and results text ###
 heatmap.text: |
-  The number of Single Nucleotide Polymorphisms (SNPs) between each sample is shown on the heatmap below. There is no established rule for
-  determining how many SNPs are needed to classify an outbreak. Generally it is best to look for patterns in the data between the SNP data and the
-  phylogenetic tree. The samples are ordered based on the Euclidean distance between each sample.
+  The number of Single Nucleotide Polymorphisms (SNPs) between each sample is shown on the heatmap below. The samples are ordered based on the Euclidean distance between each sample.
 tree.text: |
   Phylogenetic trees visualize the relatedness and genetic diversity of samples. Closely related samples will generally share a recent common ancestor and a small amount of horizontal distance on the tree.
 ar_gene_summary.text: |
-  This report shows a summary of all antimicrobial resistance genes detected using the [CDC Phoenix pipeline]() within the ODH AST piepline.
-ar_gene_summary.text: |
-  This report shows a summary of all antimicrobial resistance genes detected using the [CDC Phoenix pipeline]() within the ODH AST piepline.
+  This report shows a summary of all antimicrobial resistance genes detected using the [CDC Phoenix pipeline](https://github.com/CDCgov/phoenix) within the ODH [AST pipeline](https://github.com/ODHL/AST_Workflow).
 matrix.text: |
-  Three images are highlighted below. 1) A presence and absence matrix against a tree. 2) A piechart of the pan genome, breaking down the core, soft core, shell and cloud. 3) A pan genome frequency plot.
-optionaldata.text: |
-  [Information about any additional tables added to the report here]
+  Three images are highlighted below. 
+  1) A presence and absence matrix against a tree. 
+  2) A piechart of the pangenome, breaking down the core, soft core, shell and cloud. 
+  3) A pangenome frequency plot.
+pangemone.pa: |
+  A presence and absence matrix against a tree. 
+pangenome.pie: |
+  A piechart of the pangenome, breaking down the core, soft core, shell and cloud genes
+pangenome.frequency: |
+  A pangenome frequency plot.
 
 ### report methodology params ###
 
@@ -44,7 +47,7 @@ optionaldata.text: |
 heat.dist.method: 'euclidean'
 
 # show SNP values in the heatmap (TRUE/FALSE)
-show.snp: FALSE
+show.snp: TRUE
 
 # tree rooting method, must be one of the following:
 # 'midpoint', 'unrooted', or a sample id
@@ -54,5 +57,6 @@ root.method: 'midpoint'
 show.bootstrap: FALSE
 bootstrap.threshold: 80
 
-# path to logo shown in the top left corner of the report
-logo: '/home/ubuntu/.nextflow/assets/ODHL/AST/assets/generator_logo.png'
+# path to logo shown in the top left,right corner of the report
+logo: 'generator_logo.png'
+logo2: 'ODH_logo.png'

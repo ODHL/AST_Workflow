@@ -12,9 +12,9 @@ ODH_version: "v1.1.0"
 phoenix_version: "v1.1.0"
 dryad_version: "3.0.1"
 
-analysis_cmd: "-r"
-analysis_cmd_resume: "-resume -r"
-analysis_cmd_trailing: "-profile docker -entry ANALYSIS_RUN --max_memory 7.GB --max_cpus 4"
+analysis_cmd: ""
+analysis_cmd_resume: "-resume"
+analysis_cmd_trailing: "-profile docker -entry ANALYSIS --max_memory 7.GB --max_cpus 4"
 
 # ref files
 ref_fasta: "/home/ubuntu/refs/ASM211692v1.fasta"
