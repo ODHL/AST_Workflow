@@ -1,4 +1,5 @@
-# bash bin/core_reporting_new.sh /home/ubuntu/output/ast_run1 BASIC
+# bash bin/core_reporting.sh /home/ubuntu/output/ast_run1 BASIC
+# bash bin/core_reporting.sh /home/ubuntu/output/ast_run2 BASIC
 
 #########################################################
 # ARGS
