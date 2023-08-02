@@ -23,12 +23,12 @@ process KRAKEN2_KRAKEN2 {
     def args                       = task.ext.args ?: ''
     def prefix                     = task.ext.prefix ?: "${meta.id}"
     def paired                     = meta.single_end ? "" : "--paired"
-    def classified                 = meta.single_end ? "${prefix}.classified.fastq"   : "${prefix}.classified#.fastq"
-    def unclassified               = meta.single_end ? "${prefix}.unclassified.fastq" : "${prefix}.unclassified#.fastq"
+    def classified                 = meta.single_end ? "${prefix}.classified.fasta"   : "${prefix}.classified#.fasta"
+    def unclassified               = meta.single_end ? "${prefix}.unclassified.fasta" : "${prefix}.unclassified#.fasta"
     def classified_command         = save_output_fastqs ? "--classified-out ${classified}" : ""
     def unclassified_command       = save_output_fastqs ? "--unclassified-out ${unclassified}" : ""
     def readclassification_command = save_reads_assignment ? "--output ${prefix}.kraken2_${kraken_type}.classifiedreads.txt" : ""
-    def compress_reads_command     = save_output_fastqs ? "gzip *.fastq" : ""
+    def compress_reads_command     = save_output_fastqs ? "gzip *.fasta" : ""
 
     """
     kraken2 \\
@@ -37,7 +37,7 @@ process KRAKEN2_KRAKEN2 {
         --report ${prefix}.kraken2_${kraken_type}.report.txt \\
         --gzip-compressed \\
         --memory-mapping \\
-	    $unclassified_command \\
+        $unclassified_command \\
         $classified_command \\
         $readclassification_command \\
         $paired \\
@@ -45,6 +45,11 @@ process KRAKEN2_KRAKEN2 {
         $reads
 
     $compress_reads_command
-    cp ~/workflows/AST_Workflow/conf/kraken2.yaml versions.yml
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        kraken2: \$(echo \$(kraken2 --version 2>&1) | sed 's/^.*Kraken version //; s/ .*\$//')
+        kraken2db: \$(echo \$(basename "${params.kraken2db}"))
+    END_VERSIONS
     """
 }
