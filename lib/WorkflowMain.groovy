@@ -9,27 +9,26 @@ class WorkflowMain {
     //
     public static String citation(workflow) {
         return "If you use ${workflow.manifest.name} for your analysis please cite:\n\n" +
-            // TODO nf-core: Add Zenodo DOI for pipeline after first release
-            //"* The pipeline\n" +
-            //"  https://doi.org/10.5281/zenodo.XXXXXXX\n\n" +
+            "* PHoeNIx\n" +
+            " https://doi.org/10.5281/zenodo.8148569\n\n" +
             "* The nf-core framework\n" +
             "  https://doi.org/10.1038/s41587-020-0439-x\n\n" +
             "* Software dependencies\n" +
             "  https://github.com/${workflow.manifest.name}/blob/main/CITATIONS.md"
     }
 
-    // //
-    // // Print help to screen if required
-    // //
-    // public static String help(workflow, params, log) {
-    //     def command = "nextflow run ${workflow.manifest.name} -r \$version -entry PHOENIX -profile <singularity,docker,test,custom> --input samplesheet.csv --kraken2db \$PATH_TO_DB"
-    //     def help_string = ''
-    //     help_string += NfcoreTemplate.logo(workflow, params.monochrome_logs)
-    //     help_string += NfcoreSchema.paramsHelp(workflow, params, command)
-    //     help_string += '\n' + citation(workflow) + '\n'
-    //     help_string += NfcoreTemplate.dashedLine(params.monochrome_logs)
-    //     return help_string
-    // }
+    //
+    // Print help to screen if required
+    //
+    public static String help(workflow, params, log) {
+        def command = "nextflow run ${workflow.manifest.name} -r \$version -entry PHOENIX -profile <singularity,docker,test,custom> --input samplesheet.csv --kraken2db \$PATH_TO_DB"
+        def help_string = ''
+        help_string += NfcoreTemplate.logo(workflow, params.monochrome_logs)
+        help_string += NfcoreSchema.paramsHelp(workflow, params, command)
+        help_string += '\n' + citation(workflow) + '\n'
+        help_string += NfcoreTemplate.dashedLine(params.monochrome_logs)
+        return help_string
+    }
 
     //
     // Print parameter summary log to screen
@@ -72,11 +71,11 @@ class WorkflowMain {
         // Check AWS batch settings
         NfcoreTemplate.awsBatch(workflow, params)
 
-        // Check input has been provided
+        /*/ Check input has been provided  // turned this off to allow --indir as another option for input
         if (!params.input) {
             log.error "Please provide an input samplesheet to the pipeline e.g. '--input samplesheet.csv'"
             System.exit(1)
-        }
+        }*/
     }
 
 }

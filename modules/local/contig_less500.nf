@@ -22,7 +22,7 @@ process BBMAP_REFORMAT {
     def minlength = params.minlength
     def maxmem = task.memory.toGiga()-(task.attempt*9) // keep heap mem low so and rest of mem is for java expansion.
     """
-    maxmem=\$(echo \"$maxmem GB\"| sed 's/ GB/g/g')
+    maxmem=\$(echo \"$maxmem GB\"| sed 's/ GB/g/g' | sed 's/-//g')
     reformat.sh \\
         -Xmx\$maxmem \\
         $raw \\

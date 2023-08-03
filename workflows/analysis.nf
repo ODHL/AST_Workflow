@@ -37,14 +37,14 @@ ch_multiqc_config        = file("$projectDir/assets/multiqc_config.yaml", checkI
 ch_multiqc_custom_config = params.multiqc_config ? Channel.fromPath(params.multiqc_config) : Channel.empty()
 ch_snp_config            = file("$projectDir/assets/snppipipeline.conf", checkIfExists: true)
 ch_ar_config            = file("$projectDir/assets/ar_report_config.yaml", checkIfExists: true)
-
 /*
+
 ========================================================================================
     IMPORT LOCAL MODULES
 ========================================================================================
 */
-
 include { ASSET_CHECK                    } from '../modules/local/asset_check'
+include { GET_RAW_STATS                  } from '../modules/local/get_raw_stats'
 include { BBDUK                          } from '../modules/local/bbduk'
 include { FASTP as FASTP_TRIMD           } from '../modules/local/fastp'
 include { FASTP_SINGLES                  } from '../modules/local/fastp_singles'
@@ -59,8 +59,8 @@ include { MASH_DIST                      } from '../modules/local/mash_distance'
 include { FASTANI                        } from '../modules/local/fastani'
 include { DETERMINE_TOP_TAXA             } from '../modules/local/determine_top_taxa'
 include { FORMAT_ANI                     } from '../modules/local/format_ANI_best_hit'
-include { GATHERING_READ_QC_STATS        } from '../modules/local/fastp_minimizer'
-include { DETERMINE_TAXA_ID              } from '../modules/local/tax_classifier'
+include { GET_TRIMD_STATS                } from '../modules/local/get_trimd_stats'
+include { DETERMINE_TAXA_ID              } from '../modules/local/determine_taxa_id'
 include { PROKKA                         } from '../modules/local/prokka'
 include { GET_TAXA_FOR_AMRFINDER         } from '../modules/local/get_taxa_for_amrfinder'
 include { AMRFINDERPLUS_RUN              } from '../modules/local/run_amrfinder'
@@ -68,6 +68,7 @@ include { CALCULATE_ASSEMBLY_RATIO       } from '../modules/local/assembly_ratio
 include { CREATE_SUMMARY_LINE            } from '../modules/local/phoenix_summary_line'
 include { FETCH_FAILED_SUMMARIES         } from '../modules/local/fetch_failed_summaries'
 include { GATHER_SUMMARY_LINES           } from '../modules/local/phoenix_summary'
+include { GRIPHIN                        } from '../modules/local/griphin'
 include { ROARY                          } from '../modules/local/roary' // Perform core genome alignment using Roary
 include { TREE                           } from '../modules/local/core_genome_tree' //Infer ML tree from core genome alignment using IQ-TREE
 include { ROARY_PLOTS                    } from '../modules/local/roary_plots'
@@ -115,6 +116,7 @@ workflow ANALYSIS_RUN {
 
         // Allow outdir to be relative
         outdir_path = Channel.fromPath(params.outdir, relative: true)
+        kraken2_db_path  = Channel.fromPath(params.kraken2db, relative: true)
 
         // SUBWORKFLOW: Read in samplesheet/list, validate and stage input files
         INPUT_CHECK (
@@ -123,7 +125,12 @@ workflow ANALYSIS_RUN {
 
         //unzip any zipped databases
         ASSET_CHECK (
-            params.zipped_sketch
+            params.zipped_sketch, params.custom_mlstdb, kraken2_db_path
+        )
+
+         // Get stats on raw reads
+        GET_RAW_STATS (
+            INPUT_CHECK.out.reads
         )
 
         // Remove PhiX reads
@@ -147,8 +154,8 @@ workflow ANALYSIS_RUN {
         // Combining fastp json outputs based on meta.id
         fastp_json_ch = FASTP_TRIMD.out.json.join(FASTP_SINGLES.out.json, by: [0])
 
-        // Script gathers data from jsons for pipeline stats file
-        GATHERING_READ_QC_STATS(
+        // Script gathers data from fastp jsons for pipeline stats file
+        GET_TRIMD_STATS (
             fastp_json_ch
         )
 
@@ -160,14 +167,14 @@ workflow ANALYSIS_RUN {
 
         // Checking for Contamination in trimmed reads, creating krona plots and best hit files
         KRAKEN2_TRIMD (
-            FASTP_TRIMD.out.reads, "trimd", GATHERING_READ_QC_STATS.out.fastp_total_qc, []
+            FASTP_TRIMD.out.reads, "trimd", GET_TRIMD_STATS.out.fastp_total_qc, [], ASSET_CHECK.out.kraken_db
         )
         ch_versions = ch_versions.mix(KRAKEN2_TRIMD.out.versions)
 
         SPADES_WF (
             FASTP_SINGLES.out.reads, FASTP_TRIMD.out.reads, \
-            GATHERING_READ_QC_STATS.out.fastp_total_qc, \
-            GATHERING_READ_QC_STATS.out.fastp_raw_qc, \
+            GET_TRIMD_STATS.out.fastp_total_qc, \
+            GET_RAW_STATS.out.combined_raw_stats, \
             [], \
             KRAKEN2_TRIMD.out.report, KRAKEN2_TRIMD.out.krona_html, \
             KRAKEN2_TRIMD.out.k2_bh_summary, \
@@ -175,7 +182,7 @@ workflow ANALYSIS_RUN {
         )
         ch_versions = ch_versions.mix(SPADES_WF.out.versions)
 
-        // Rename scaffold headers
+         // Rename scaffold headers
         RENAME_FASTA_HEADERS (
             SPADES_WF.out.spades_ch
         )
@@ -212,15 +219,18 @@ workflow ANALYSIS_RUN {
 
         // Creating krona plots and best hit files for weighted assembly
         KRAKEN2_WTASMBLD (
-            BBMAP_REFORMAT.out.filtered_scaffolds,"wtasmbld", [], QUAST.out.report_tsv
+            BBMAP_REFORMAT.out.filtered_scaffolds,"wtasmbld", [], QUAST.out.report_tsv, ASSET_CHECK.out.kraken_db
         )
         // ch_versions = ch_versions.mix(KRAKEN2_WTASMBLD.out.versions)
 
+        // combine filtered scaffolds and mash_sketch so mash_sketch goes with each filtered_scaffolds file
+        mash_dist_ch = BBMAP_REFORMAT.out.filtered_scaffolds.combine(ASSET_CHECK.out.mash_sketch)
+
         // Running Mash distance to get top 20 matches for fastANI to speed things up
         MASH_DIST (
-            BBMAP_REFORMAT.out.filtered_scaffolds, ASSET_CHECK.out.mash_sketch
+            mash_dist_ch
         )
-        ch_versions = ch_versions.mix(MASH_DIST.out.versions)
+        // ch_versions = ch_versions.mix(MASH_DIST.out.versions)
 
         // Combining mash dist with filtered scaffolds based on meta.id
         top_taxa_ch = MASH_DIST.out.dist.map{           meta, dist  -> [[id:meta.id], dist]}\
@@ -230,12 +240,12 @@ workflow ANALYSIS_RUN {
         DETERMINE_TOP_TAXA (
             top_taxa_ch
         )
-        // ch_versions = ch_versions.mix(DETERMINE_TOP_TAXA.out.versions)
+        ch_versions = ch_versions.mix(DETERMINE_TOP_TAXA.out.versions)
 
         // Combining filtered scaffolds with the top taxa list based on meta.id
-        top_taxa_list_ch = BBMAP_REFORMAT.out.filtered_scaffolds.map{meta, reads           -> [[id:meta.id], reads]}\
-        .join(DETERMINE_TOP_TAXA.out.top_taxa_list.map{              meta, top_taxa_list   -> [[id:meta.id], top_taxa_list ]},   by: [0])\
-        .join(DETERMINE_TOP_TAXA.out.reference_files.map{            meta, reference_files -> [[id:meta.id], reference_files ]}, by: [0])
+        top_taxa_list_ch = BBMAP_REFORMAT.out.filtered_scaffolds.map{meta, reads         -> [[id:meta.id], reads]}\
+        .join(DETERMINE_TOP_TAXA.out.top_taxa_list.map{              meta, top_taxa_list -> [[id:meta.id], top_taxa_list ]}, by: [0])\
+        .join(DETERMINE_TOP_TAXA.out.reference_dir.map{              meta, reference_dir -> [[id:meta.id], reference_dir ]}, by: [0])
 
         // Getting species ID
         FASTANI (
@@ -247,6 +257,7 @@ workflow ANALYSIS_RUN {
         FORMAT_ANI (
             FASTANI.out.ani
         )
+        ch_versions = ch_versions.mix(FORMAT_ANI.out.versions)
 
         // Combining weighted kraken report with the FastANI hit based on meta.id
         best_hit_ch = KRAKEN2_WTASMBLD.out.report.map{meta, kraken_weighted_report -> [[id:meta.id], kraken_weighted_report]}\
@@ -264,8 +275,10 @@ workflow ANALYSIS_RUN {
             BBMAP_REFORMAT.out.filtered_scaffolds, \
             FASTP_TRIMD.out.reads, \
             DETERMINE_TAXA_ID.out.taxonomy, \
+            ASSET_CHECK.out.mlst_db, \
             false
         )
+        // ch_versions = ch_versions.mix(DO_MLST.out.versions)
 
         // get gff and protein files for amrfinder+
         PROKKA (
@@ -281,6 +294,7 @@ workflow ANALYSIS_RUN {
         GET_TAXA_FOR_AMRFINDER (
             DETERMINE_TAXA_ID.out.taxonomy
         )
+        // ch_versions = ch_versions.mix(GET_TAXA_FOR_AMRFINDER.out.versions)
 
         // Generate core genome statistics
         ROARY (
@@ -328,9 +342,8 @@ workflow ANALYSIS_RUN {
         // ch_versions = ch_versions.mix(CALCULATE_ASSEMBLY_RATIO.out.versions)
 
         GENERATE_PIPELINE_STATS_WF (
-            FASTP_TRIMD.out.reads, \
-            GATHERING_READ_QC_STATS.out.fastp_raw_qc, \
-            GATHERING_READ_QC_STATS.out.fastp_total_qc, \
+            GET_RAW_STATS.out.combined_raw_stats, \
+            GET_TRIMD_STATS.out.fastp_total_qc, \
             [], \
             KRAKEN2_TRIMD.out.report, \
             KRAKEN2_TRIMD.out.krona_html, \
@@ -353,10 +366,12 @@ workflow ANALYSIS_RUN {
             CALCULATE_ASSEMBLY_RATIO.out.gc_content, \
             false
         )
+        // ch_versions = ch_versions.mix(GENERATE_PIPELINE_STATS_WF.out.versions)
 
         // Combining output based on meta.id to create summary by sample -- is this verbose, ugly and annoying? yes, if anyone has a slicker way to do this we welcome the input.
-        line_summary_ch = GATHERING_READ_QC_STATS.out.fastp_total_qc.map{meta, fastp_total_qc  -> [[id:meta.id], fastp_total_qc]}\
-        //.join(MLST.out.tsv.map{                                          meta, tsv             -> [[id:meta.id], tsv]},             by: [0])\
+        //first check if FORMAT_ANI.out.ani_best_hit is empty
+        //ani_best_hit_ch = FORMAT_ANI.out.ani_best_hit.ifEmpty()
+        line_summary_ch = GET_TRIMD_STATS.out.fastp_total_qc.map{meta, fastp_total_qc  -> [[id:meta.id], fastp_total_qc]}\
         .join(DO_MLST.out.checked_MLSTs.map{                             meta, checked_MLSTs   -> [[id:meta.id], checked_MLSTs]},   by: [0])\
         .join(GAMMA_HV.out.gamma.map{                                    meta, gamma           -> [[id:meta.id], gamma]},           by: [0])\
         .join(GAMMA_AR.out.gamma.map{                                    meta, gamma           -> [[id:meta.id], gamma]},           by: [0])\
@@ -366,22 +381,25 @@ workflow ANALYSIS_RUN {
         .join(GENERATE_PIPELINE_STATS_WF.out.pipeline_stats.map{         meta, pipeline_stats  -> [[id:meta.id], pipeline_stats]},  by: [0])\
         .join(DETERMINE_TAXA_ID.out.taxonomy.map{                        meta, taxonomy        -> [[id:meta.id], taxonomy]},        by: [0])\
         .join(KRAKEN2_TRIMD.out.k2_bh_summary.map{                       meta, k2_bh_summary   -> [[id:meta.id], k2_bh_summary]},   by: [0])\
-        .join(AMRFINDERPLUS_RUN.out.report.map{                          meta, report          -> [[id:meta.id], report]},          by: [0])
+        .join(AMRFINDERPLUS_RUN.out.report.map{                          meta, report          -> [[id:meta.id], report]},          by: [0])\
+        .join(FORMAT_ANI.out.ani_best_hit.map{                           meta, ani_best_hit    -> [[id:meta.id], ani_best_hit]},    by: [0])
 
         // Generate summary per sample that passed SPAdes
         CREATE_SUMMARY_LINE(
             line_summary_ch
         )
-        // ch_versions = ch_versions.mix(CREATE_SUMMARY_LINE.out.versions)
+        ch_versions = ch_versions.mix(CREATE_SUMMARY_LINE.out.versions)
 
         // Collect all the summary files prior to fetch step to force the fetch process to wait
-        failed_summaries_ch         = SPADES_WF.out.line_summary.collect().ifEmpty(params.placeholder) // if no spades failure pass empty file to keep it moving..
-        summaries_ch                = CREATE_SUMMARY_LINE.out.line_summary.collect()
+        failed_summaries_ch = SPADES_WF.out.line_summary.collect().ifEmpty(params.placeholder) // if no spades failure pass empty file to keep it moving...
+        // If you only run one sample and it fails spades there is nothing in the create line summary so pass an empty list to keep it moving...
+        summaries_ch = CREATE_SUMMARY_LINE.out.line_summary.collect().ifEmpty( [] )
 
         // This will check the output directory for an files ending in "_summaryline_failure.tsv" and add them to the output channel
         FETCH_FAILED_SUMMARIES (
             outdir_path, failed_summaries_ch, summaries_ch
         )
+        ch_versions = ch_versions.mix(FETCH_FAILED_SUMMARIES.out.versions)
 
         // combine all line summaries into one channel
         spades_failure_summaries_ch = FETCH_FAILED_SUMMARIES.out.spades_failure_summary_line
@@ -391,7 +409,13 @@ workflow ANALYSIS_RUN {
         GATHER_SUMMARY_LINES (
             all_summaries_ch, outdir_path, false
         )
-        // ch_versions = ch_versions.mix(GATHER_SUMMARY_LINES.out.versions)
+        ch_versions = ch_versions.mix(GATHER_SUMMARY_LINES.out.versions)
+
+        //create GRiPHin report
+        GRIPHIN (
+            all_summaries_ch, INPUT_CHECK.out.valid_samplesheet, params.ardb, outdir_path, params.coverage, true, false
+        )
+        ch_versions = ch_versions.mix(GATHER_SUMMARY_LINES.out.versions)
 
         // // Create WGS ID's
         // WGS_ID_GENERATION(

@@ -157,6 +157,15 @@ if [[ "$pipeline" == "init" ]]; then
         echo -e "Configs are ready to be edited:\n${log_dir}"
         echo "*** INITIALIZATION COMPLETE ***"
         echo
+elif [[ "$pipeline" == "run_validation" ]]; then
+        sudo rm -rf ~/output/OH-VH00648-230526_AST
+
+        sudo rm -rf work
+
+        bash run_workflow.sh -p init -n OH-VH00648-230526_AST 
+        
+        bash run_workflow.sh -p analysis -n OH-VH00648-230526_AST -t Y
+        
 elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "analysis" ]]; then
 
         #############################################################################################
