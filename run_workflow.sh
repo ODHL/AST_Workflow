@@ -19,15 +19,15 @@ helpFunction()
 {
    echo ""
    echo "Usage: $1 -p [REQUIRED] pipeline mode options"
-   echo -e "\t-m options: init, all, analysis, cleanup, report"
+   echo -e "\t-p options: init, all, analysis, cleanup, report"
    echo "Usage: $2 -n [REQUIRED] project_id"
    echo -e "\t-n project id"
    echo "Usage: $3 -r [OPTIONAL] resume_run"
-   echo -e "\t-p Y,N option to resume a partial run settings (default N)"
+   echo -e "\t-r Y,N option to resume a partial run settings (default N)"
    echo "Usage: $4 -t [OPTIONAL] testing_flag"
    echo -e "\t-t Y,N option to run test settings (default N)"
-   echo "Usage: $5 -e [OPTIONAL] testing_flag"
-   echo -e "\t-t Y,N option to run test settings (default N)"
+   echo "Usage: $5 -o [OPTIONAL] report_flag"
+   echo -e "\t-o type of report [BASIC OUTBREAK NOVEL REGIONAL TIME]"
 
    exit 1 # Exit script after printing help
 }
@@ -46,13 +46,14 @@ source $(dirname "$0")/bin/core_functions.sh
 #############################################################################################
 # helper function
 #############################################################################################
-while getopts "p:n:r:t:" opt
+while getopts "p:n:r:t:o:" opt
 do
    case "$opt" in
         p ) pipeline="$OPTARG" ;;
         n ) project_id="$OPTARG" ;;
         r ) resume_flag="$OPTARG" ;;
         t ) testing_flag="$OPTARG" ;;
+        o ) report_flag="$OPTARG" ;;
         ? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
    esac
 done
@@ -162,9 +163,16 @@ elif [[ "$pipeline" == "run_validation" ]]; then
 
         sudo rm -rf work
 
+        sudo rm -rf ./.nextflow/cache
+
         bash run_workflow.sh -p init -n OH-VH00648-230526_AST 
         
         bash run_workflow.sh -p analysis -n OH-VH00648-230526_AST -t Y
+
+        mkdir ~/output/validation_run
+        echo "~/output//home/ubuntu/output/OH-VH00648-230526/pipeline/batch_1" > ~/output/validation_run/project_list.tsv
+        
+        bash run_workflow.sh -p report -n validation_run -o BASIC
         
 elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "analysis" ]]; then
 
@@ -214,7 +222,6 @@ elif [[ "$pipeline" == "all" ]] || [[ "$pipeline" == "report" ]]; then
 
         bash bin/core_reporting.sh \
                 "${output_dir}" \
-                "${project_name_full}" \
-                "${pipeline_config}"
+                "${report_flag}"
 
 fi
