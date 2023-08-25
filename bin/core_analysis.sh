@@ -19,6 +19,12 @@ if [[ $resume_flag == "Y" ]]; then
 	flag_ID="N"
 	flag_analysis="N"
 	flag_resume="Y"
+elif [[ $resume_flag == "DLONLY" ]]; then
+	flag_download="Y"
+	flag_batch="N"
+	flag_ID="N"
+	flag_analysis="N"
+	flag_resume="N"
 elif [[ $resume_flag == "BATCHONLY" ]]; then
 	flag_download="Y"
 	flag_batch="Y"
@@ -150,7 +156,7 @@ if [[ $flag_batch == "Y" ]]; then
 	echo "--Creating batch files"
 	
 	#create sample_id file - grab all files in dir, split by _, exclude noro- file names
-	ls $tmp_dir | grep "ds"| cut -f1 -d "-" | grep -v "noro.*" > tmp.txt
+	ls $tmp_dir | grep "ds"| cut -f1 -d "_" | grep -v "noro.*" > tmp.txt
 	cat tmp.txt | uniq > $sample_id_file
 	rm tmp.txt
 
@@ -184,7 +190,7 @@ if [[ $flag_batch == "Y" ]]; then
 			fastq_batch_dir=$fastq_dir/batch_$batch_count
         fi
         	
-        	#echo sample id to the batch
+        #echo sample id to the batch
  		echo ${sample_id} >> $batch_manifest
                	
 		# prepare samplesheet
@@ -219,7 +225,7 @@ if [[ $flag_batch == "Y" ]]; then
 		head -5 $samplesheet > $log_dir/save/samplesheet.csv
 		mv $log_dir/save/samplesheet.csv $samplesheet
 
-		# remove old  manifests
+		# remove old manifests
 		rm $log_dir/batch_*
 
 		# replace update manifests and cleanup
@@ -230,6 +236,11 @@ if [[ $flag_batch == "Y" ]]; then
 		sample_count=4
 		batch_count=1
 	fi
+
+	# clear project names
+	project_name_sub=`echo $project_name_full | cut -f1 -d"_"`
+	sed -i "s/-$project_name_full//g" $samplesheet
+	sed -i "s/-$project_name_sub//g" $samplesheet
 
 	#log
 	message_cmd_log "--A total of $sample_count samples will be processed in $batch_count batches, with a maximum of $config_batch_limit samples per batch"
