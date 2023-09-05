@@ -2,7 +2,8 @@ process CALCULATE_ASSEMBLY_RATIO {
     tag "$meta.id"
     label 'process_single'
     container 'quay.io/jvhagey/phoenix:base_v2.0.0'
-
+    errorStrategy 'ignore'
+    
     input:
     tuple val(meta), path(taxa_file), path(quast_report)
     path(ncbi_database)
@@ -24,7 +25,15 @@ process CALCULATE_ASSEMBLY_RATIO {
     }
     def container = task.container.toString() - "quay.io/jvhagey/phoenix:"
     """
-    calculate_assembly_ratio.sh -d $ncbi_database -q $quast_report -x $taxa_file -s ${prefix} $terra
+    # handle negative controls
+    CHECK=`cat "$taxa_file" | grep "Not_assigned" | wc -l`
+
+    if [[ \$CHECK == 0 ]]; then
+        calculate_assembly_ratio.sh -d $ncbi_database -q $quast_report -x $taxa_file -s ${prefix} $terra
+    else
+        touch ${prefix}_Assembly_ratio_${prefix}.txt
+        touch ${prefix}_GC_content_${prefix}.txt 
+    fi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

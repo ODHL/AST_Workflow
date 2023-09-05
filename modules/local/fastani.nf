@@ -28,10 +28,18 @@ process FASTANI {
     if [[ "\${db_version}" = "" ]]; then
         db_version="REFSEQ_unknown"
     fi
-    fastANI \\
-        -q $query \\
-        --rl $reference \\
-        -o ${prefix}_\${db_version}.ani.txt
+
+    # handle negative controls
+    FILESIZE=\$(wc -c <\$"$reference")
+
+    if [[ \$FILESIZE -gt 1 ]]; then
+        fastANI \\
+            -q $query \\
+            --rl $reference \\
+            -o ${prefix}_\${db_version}.ani.txt
+    else
+        touch ${prefix}_\${db_version}.ani.txt
+    fi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

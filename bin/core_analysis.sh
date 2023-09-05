@@ -154,7 +154,19 @@ if [[ $flag_batch == "Y" ]]; then
 	# All project ID's download from BASESPACE will be processed into batches
 	# Batch count depends on user input from pipeline_config.yaml
 	echo "--Creating batch files"
-	
+
+	# remove _ in bank dirs to avoid downstream ID errors
+	for dir in $tmp_dir/Bank*; do
+		update_dir=`echo $dir | sed "s/Bank_/Bank/g"`
+		mv $dir $update_dir
+
+		# handle FASTQ files to match parent dir name
+		for fq in $update_dir/*; do
+			update_fq=`echo $fq | sed "s/Bank-/Bank/g"`
+			mv $fq $update_fq
+		done
+	done
+
 	#create sample_id file - grab all files in dir, split by _, exclude noro- file names
 	ls $tmp_dir | grep "ds"| cut -f1 -d "_" | grep -v "noro.*" > tmp.txt
 	cat tmp.txt | uniq > $sample_id_file

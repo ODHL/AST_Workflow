@@ -129,3 +129,8 @@ while IFS= read -r var; do
 	fi
 	counter=$(( counter + 1 ))
 done < ${sorted_dists}
+
+# create an empty file if there are no hits - needed for negative controls
+if [[ ! -f "${sample_name}_best_MASH_hits.txt" ]]; then
+	touch "${sample_name}_best_MASH_hits.txt"
+fi
