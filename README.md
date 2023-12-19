@@ -3,11 +3,19 @@
 ## Background
 This pipeline was built from components of two pipelines:
 
-1) PHoeNIx: A short-read pipeline for healthcare-associated and antimicrobial resistant pathogens
-2) DRYAD: 
+1) [PHoeNIx](https://github.com/CDCgov/phoenix): A short-read pipeline for healthcare-associated and antimicrobial resistant pathogens
+2) [DRYAD](https://github.com/wslh-bio/dryad): A pipeline to construct reference free core-genome or SNP phylogenetic trees for examining prokaryote relatedness in outbreaks
+
+## Databases
+The following databases are utilized to generate the data within this pipeline:
+
+- [AMRFinderPlus database](https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/): [Version 2023-04-17.1](https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/3.11/)
+- [ARG-ANNOT database](http://backup.mediterranee-infection.com/arkotheque/client/ihumed/_depot_arko/articles/2041/arg-annot-v4-aa-may2018_doc.fasta): [Latest version NT v6 July 2019](https://www.mediterranee-infection.com/acces-ressources/base-de-donnees/arg-annot-2/)
+- [ResFinder database](https://bitbucket.org/genomicepidemiology/resfinder_db/src/master/): [v2.1.0](https://bitbucket.org/genomicepidemiology/resfinder_db/commits/branch/master) including until 2023-04-12 commit f46d8fc
+- [MLST database](https://github.com/tseemann/mlst): static db generated from [PubMLST.org](https://pubmlst.org/) 2023-05-02
+- [Kraken database](https://ccb.jhu.edu/software/kraken2/): [standard-8 db](https://benlangmead.github.io/aws-indexes/k2)
 
 ## Dependencies
-
 [![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A521.10.3-23aa62.svg?labelColor=000000)](https://www.nextflow.io/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 

@@ -1,10 +1,10 @@
 process AMRFINDERPLUS_RUN {
     tag "$meta.id"
     label 'process_medium'
-    //container 'staphb/ncbi-amrfinderplus:3.10.36'
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container 'staphb/ncbi-amrfinderplus:3.11.11-2023-04-17.1'
+    /*container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/ncbi-amrfinderplus%3A3.10.45--h6e70893_0':
-        'quay.io/biocontainers/ncbi-amrfinderplus:3.10.45--h6e70893_0' }"
+        'quay.io/biocontainers/ncbi-amrfinderplus:3.10.45--h6e70893_0' }"*/
 
     input:
     tuple val(meta), path(nuc_fasta), val(organism_param), path(pro_fasta), path(gff)
@@ -12,7 +12,6 @@ process AMRFINDERPLUS_RUN {
 
     output:
     tuple val(meta), path("${meta.id}_all_genes.tsv"),                    emit: report
-    path("${meta.id}_all_genes.tsv"),                                     emit: report_only
     tuple val(meta), path("${meta.id}_all_mutations.tsv"), optional:true, emit: mutation_report
     path("versions.yml")                                 ,                emit: versions
 

@@ -17,6 +17,12 @@ summary.paragraph: |
   This report describes the relatedness between a set of bacterial genomes from a suspected outbreak.
 methods.text: |
   The figures shown here were generated using sequence data processed with the [ODH AST](https://github.com/ODHL/AST_Workflow) data analysis pipeline. SNPs were called using the [Center for Food Safety and Applied Nutrition (CFSAN) SNP](https://github.com/CFSAN-Biostatistics/snp-pipeline) pipeline. If you have questions about this report please contact [Samantha Chill](samantha.chill@odh.ohio.gov).
+  The following databases are utilized to generate the data within this report:
+  1) [AMRFinderPlus database](https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/): [Version 2023-04-17.1](https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/3.11/)
+  2) [ARG-ANNOT database](http://backup.mediterranee-infection.com/arkotheque/client/ihumed/_depot_arko/articles/2041/arg-annot-v4-aa-may2018_doc.fasta): [Latest version NT v6 July 2019](https://www.mediterranee-infection.com/acces-ressources/base-de-donnees/arg-annot-2/)
+  3) [ResFinder database](https://bitbucket.org/genomicepidemiology/resfinder_db/src/master/): [v2.1.0](https://bitbucket.org/genomicepidemiology/resfinder_db/commits/branch/master) including until 2023-04-12 commit f46d8fc
+  4) [MLST database](https://github.com/tseemann/mlst): static db generated from [PubMLST.org](https://pubmlst.org/) 2023-05-02
+  5) [Kraken database](https://ccb.jhu.edu/software/kraken2/): [standard-8 db](https://benlangmead.github.io/aws-indexes/k2)
 disclaimer.text: |
   The information included in this report should only be used to support infection prevention measures. This report should not be used to guide treatment decisions, nor should it be included in the patient record.
   Whole-genome sequencing analysis is a rapidly evolving technology. Whole-genome sequencing and single nucleotide variant analysis will continue to be adjusted and refined over time due to the varied nature of bacterial genomes, limitations on available reference genomes and continual assessment of the inclusion of mobile genetic elements in this analysis. These results represent the most advanced method currently available for genome comparisons.
@@ -43,20 +49,4 @@ pangenome.frequency: |
 ### report methodology params ###
 
 # heatmap distance metric, must be one of the following:
-# "euclidean", "maximum", "manhattan", "canberra", "binary" or "minkowski"
-heat.dist.method: 'euclidean'
-
-# show SNP values in the heatmap (TRUE/FALSE)
-show.snp: TRUE
-
-# tree rooting method, must be one of the following:
-# 'midpoint', 'unrooted', or a sample id
-root.method: 'midpoint'
-
-# show tree bootstrap (TRUE/FALSE) and threshold for displying values
-show.bootstrap: FALSE
-bootstrap.threshold: 80
-
-# path to logo shown in the top left,right corner of the report
-logo: 'generator_logo.png'
-logo2: 'ODH_logo.png'
+# "euclidean", "maximum", "manhattan", "canberr
