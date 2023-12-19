@@ -1,2 +1,0 @@
-% ID	% Coverage	Organism	Source File
-		Reference Match Reference Match	Reference Match
