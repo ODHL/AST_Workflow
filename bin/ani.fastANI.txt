@@ -1,0 +1,2 @@
+% ID	% Coverage	Organism	Source File
+98.82	79.97	Citrobacter cronae	Citrobacter_cronae_GCF_022558585.1_ASM2255858v1_genomic.fna.gz

@@ -297,9 +297,9 @@ workflow ANALYSIS_RUN {
         // ch_versions = ch_versions.mix(GET_TAXA_FOR_AMRFINDER.out.versions)
 
         // Generate core genome statistics
-        ROARY (
-            PROKKA.out.gffonly.collect(), 
-        )
+        // ROARY (
+        //     PROKKA.out.gffonly.collect(), 
+        // )
 
         // // Generate core genome tree
         // TREE (
@@ -313,11 +313,11 @@ workflow ANALYSIS_RUN {
         // )
 
         // First remove metadata from tuple, then generate SNP dist matrix
-        CFSAN (
-            FASTP_TRIMD.out.readsonly.collect(),
-            params.ardb,
-            Channel.from(ch_snp_config)
-        )
+        // CFSAN (
+        //     FASTP_TRIMD.out.readsonly.collect(),
+        //     params.ardb,
+        //     Channel.from(ch_snp_config)
+        // )
 
         // Combining taxa and scaffolds to run amrfinder and get the point mutations.
         amr_channel = BBMAP_REFORMAT.out.filtered_scaffolds.map{                 meta, reads          -> [[id:meta.id], reads]}\
