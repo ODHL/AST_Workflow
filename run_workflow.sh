@@ -19,7 +19,7 @@ helpFunction()
 {
    echo ""
    echo "Usage: $1 -p [REQUIRED] pipeline runmode"
-   echo -e "\t-p options: init, analysis, cleanup, report"
+   echo -e "\t-p options: phase1, phase2, init, analysis, wgs, ncbi_upload, ncbi_download, report, cleanup"
    echo "Usage: $2 -n [REQUIRED] project_id"
    echo -e "\t-n project id"
    echo "Usage: $3 -s [OPTIONAL] subworkflow options"
@@ -125,7 +125,7 @@ if [[ $pipeline == "phase1" ]]; then
         bash run_workflow.sh -p init -n $project_id
 
 	# run through analysis workflow
-        bash run_workflow.sh -p analysis -n $project_id -s ALL -t Y
+        bash run_workflow.sh -p analysis -n $project_id -s ALL
 
         # create WGS ids
         bash run_workflow.sh -p wgs -n $project_id
@@ -158,30 +158,22 @@ elif [[ "$pipeline" == "init" ]]; then
         for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/ncbi/$pd ]]; then mkdir -p $output_dir/ncbi/$pd; fi; done
 
         ## logs
-	dir_list=(config manifests pipeline gisaid ncbi)
+	dir_list=(config manifests pipeline)
         for pd in "${dir_list[@]}"; do if [[ ! -d $log_dir/$pd ]]; then mkdir -p $log_dir/$pd; fi; done
 
         ## analysis
-        dir_list=(fasta intermed qc reports)
+        dir_list=(intermed qc reports)
         for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi; done
 	
         #### qc
         dir_list=(data)
         for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/qc/$pd ]]; then mkdir -p $analysis_dir/qc/$pd; fi; done
 
-	#### fasta
-	dir_list=(not_uploaded gisaid_complete upload_failed)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/fasta/$pd ]]; then mkdir -p $analysis_dir/fasta/$pd; fi; done
-
-        #### tmp
-        dir_list=(fastqc unzipped)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/tmp/$pd ]]; then mkdir -p $analysis_dir/tmp/$pd; fi; done
-
         ##log file
         touch $pipeline_log
 
 	# copy config inputs to edit if doesn't exit
-	files_save=("config/config_pipeline.yaml" "config/config_multiqc.yaml")
+	files_save=("config/config_pipeline.yaml" "config/config_multiqc.yaml" "config/config_ar_report.yaml")
   	for f in ${files_save[@]}; do
         IFS='/' read -r -a strarr <<< "$f"
     	if [[ ! -f "${log_dir}/config/${strarr[1]}" ]]; then
@@ -276,30 +268,5 @@ elif [[ "$pipeline" == "cleanup" ]]; then
 # Run validation
 #############################################################################################
 elif [[ "$pipeline" == "validation" ]]; then
-        # # remove prev runs
-        # sudo rm -rf ~/output/OH-M5185-230830
-	
-        # # init
-        # bash run_workflow.sh -p init -n OH-M5185-230830
-
-	# # run through workflow
-        # bash run_workflow.sh -p analysis -n OH-M5185-230830 -s DOWNLOAD -t Y
-        # # # cp -r ~/output/OH-VH00648-230526/savelogs ~/output/OH-VH00648-230526/logs
-	# # # cp  -r ~/output/OH-VH00648-230526/savetmp ~/output/OH-VH00648-230526/tmp
-        # bash run_workflow.sh -p analysis -n OH-M5185-230830 -s BATCH -t Y
-        # # # cat ~/output/OH-M5185-230830/logs/manifests/batch_01.txt
-        # bash run_workflow.sh -p analysis -n OH-M5185-230830 -s ANALYZE -t Y
-        # # bash run_workflow.sh -p analysis -n OH-M5185-230830 -s WGS -t Y
-        # # bash run_workflow.sh -p analysis -n OH-M5185-230830 -s NCBI -t Y
-
-        # bash run_workflow.sh -p analysis -n OH-M5185-230830 -s ANALYZE -t Y -r Y
-        # bash  /home/ubuntu/workflows/AR_Workflow/wgs_db/testing LORENZO ID
-        # bash scripts/core_wgs_id.sh /home/ubuntu/output/OH-M5185-230830/analysis \
-                # /home/ubuntu/output/OH-M5185-230830/analysis/reports/batch_1_GRiPHin_Summary.tsv OH-M5185-230830
-        rm -r /home/ubuntu/output/OH-M5185-230830/ncbi/*
-        project_name="OH-M5185-230830"
-        pipeline_config="/home/ubuntu/output/$project_name/logs/config/config_pipeline.yaml"
-        wgs_results="/home/ubuntu/output/$project_name/analysis/reports/pipeline_report_wgs.csv"
-
-        bash scripts/core_ncbi.sh /home/ubuntu/output/OH-M5185-230830 OH-M5185-230830 $pipeline_config $wgs_results
+        bash validation/ast_validation.sh $subworkflow $project_name_full $resume $output_dir "${pipeline_config}" $pipeline_log
 fi

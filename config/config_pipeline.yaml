@@ -1,5 +1,5 @@
 # params
-batch_limit: 10
+batch_limit: 7
 
 # tools
 basespace_cmd: "/home/ubuntu/tools/basespace"
@@ -30,26 +30,19 @@ metadata_file: "METADATAFILE"
 ###############################
 # PARAMS REQUIRED
 ###############################
-isolation_source: "BLOOD"
-MLST: "MLST#_Scheme"
-
 ################ NCBI (attributes)
 geo_loc_name: "USA"
 host: "Homo sapiens"
 sample_type: "whole organism"
 
-instrument_model: "GREP"
-filename: "R1"
-filename2: "R2"
 ################ NCBI (metadata)
 library_strategy: "WGS"
 library_source: "Genomic"
 library_selection: "Random"
 library_layout: "Paired"
 platform: "Illumina"
-design_description: "primers"
+design_description: "WGS by Illumina MiSeq using Illumina DNA Prep library prep"
 filetype: "fastq"
-
 
 ###############################
 # PARAMS Optional
@@ -76,5 +69,3 @@ specimen_voucher: ""
 strain: ""
 temp: ""
 description: ""
-
-################ NCBI (metadata)

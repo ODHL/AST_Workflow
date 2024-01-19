@@ -41,15 +41,22 @@ basespace_command=${config_basespace_cmd}
 # Controls
 #########################################################
 # to run cleanup of frameshift samples, pass frameshift_flag
+flag_batch="N"
+flag_manifests="N"
+flag_fastqs="N"
+flag_check="N"
+flag_download="N"
 if [[ $subworkflow == "UPLOAD" ]]; then
 	flag_batch="Y"
 	flag_manifests="Y"
 	flag_fastqs="Y"
 	flag_check="Y"
+
+	# check the metadata file is available before processing
+	if [[ ! -f $metadataFILE ]]; then echo "METADATA FILE IS MISSING: $metadataFILE"; exit; fi
 elif [[ $subworkflow == "DOWNLOAD" ]]; then
 	flag_download="Y"
 fi
-	flag_something="N"
 
 #########################################################
 # Code
@@ -58,8 +65,8 @@ if [[ "$flag_batch" == "Y" ]]; then
     echo "----PREPARING BATCHES"
 	
 	# cleanup
-	if [[ -d $ncbi_dir/b* ]]; then rm -r $ncbi_dir/b*; fi
-	if [[ -f $ncbi_dir/p* ]]; then rm $ncbi_dir/p*; fi
+	if [[ -d $ncbi_dir/batch* ]]; then rm -r $ncbi_dir/batch*; fi
+	if [[ -f $ncbi_dir/passed_list.txt ]]; then rm $ncbi_dir/passed_list.txt; fi
 	
 	# pull samples that have passed QC, have WGS-IDs
 	passed_samples="$ncbi_dir/passed_list.txt"
@@ -125,10 +132,11 @@ if [[ "$flag_manifests" == "Y" ]]; then
 				sample_title=`echo "Illumina Sequencing of ${wgsID}"`
 				
 				# pull source
-				isolation_source=`echo $meta | grep -o -e "Septum" -e "Tissue" -e "Wound" -e "Tracheal Aspirate" -e "Urine" -e "Blood"`
+				isolation_source=`echo $meta | grep -o -e "Septum" -e "Tissue" -e "Wound" -e "Tracheal Aspirate" -e "Urine" -e "Blood" -e "Other" -e "RESP Endotrach"`
 
 				# pull instrument
-				instrument_model=`echo $project_id | cut -f2 -d"-"`
+				instrument_model=`echo $project_id | cut -f2 -d"-"| grep -o "^."`
+				if [[ $instrument_model == "M" ]]; then instrument_model="Illumina MiSeq"; else instrument_model="NextSeq 1000"; fi
 
 				# break output into chunks
 				chunk1="${wgsID}\t${sample_title}\t${config_bioproject_accession}\t${organism}\t${config_strain}\t${wgsID}\t${config_host}"
@@ -205,6 +213,7 @@ if [[ "$flag_check" == "Y" ]]; then
 			if [[ $att == "" ]] || [[ $meta == "" ]]; then echo "----ATT/META Error"; fi
 		done
 	done
+	echo "----UPLOAD CHECK COMPLETE"
 fi
 
 if [[ "$flag_download" == "Y" ]]; then

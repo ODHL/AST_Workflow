@@ -27,7 +27,7 @@ if [[ $flag_ids == "Y" ]]; then
     # add a new line
     echo "" >> $cached_db
 
-    # clear cached file
+    # clear old wgs file, if exists
     if [[ -f $wgs_results ]]; then rm $wgs_results; fi
     echo "sampleID,wgsID" > $wgs_results
 
@@ -54,8 +54,11 @@ if [[ $flag_ids == "Y" ]]; then
                     # YYYY-GZ-0001
                     if [[ $first_grab == "Y" ]]; then
                         echo "--pulling ID from cache"
-                        last_saved_id=`tail -n1 $cached_db | awk -F"," '{print $1}' | cut -f3 -d"-"`
+                        sed -i '/^$/d' $cached_db
+                        last_saved_id=`tail -n1 $cached_db | awk -F"," '{print $1}' | cut -f2 -d"-"`
+                        echo "last saved: $last_saved_id"
                         stripped_id=`echo "${last_saved_id#"${last_saved_id%%[!0]*}"}"`
+                        echo "stripped $stripped_id"
                         new_id=$(( stripped_id + 1 ))
                         first_grab="N"
                     fi

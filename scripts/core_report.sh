@@ -8,7 +8,19 @@ wgs_results=$4
 ncbi_results=$5
 subworkflow=$6
 
+#########################################################
+# Set dirs, files, args
+#########################################################
 final_results=$output_dir/analysis/reports/final_report.csv
+analysis_dir=$output_dir/analysis
+report_dir=$analysis_dir/reports
+intermed_dir=$analysis_dir/intermed
+log_dir=$output_dir/logs
+ncbi_dir=$output_dir/ncbi
+multiqc_config=$log_dir/config/config_multiqc.yaml
+fastqc_dir=$analysis_dir/qc/data
+qcreport_dir=$analysis_dir/qc
+multiqc_log=$log_dir/pipeline_log.txt
 ##########################################################
 # Set flags
 #########################################################
@@ -21,7 +33,7 @@ flag_time="N"
 
 if [[ $subworkflow == "BASIC" ]]; then
     flag_results="Y"
-    # flag_basic="Y"
+    flag_basic="Y"
 elif [[ $subworkflow == "OUTBREAK" ]]; then
     flag_outbreak="Y"
 elif [[ $subworkflow == "NOVEL" ]]; then
@@ -43,18 +55,18 @@ if [[ $flag_results == "Y" ]]; then
     IFS=$'\n' read -d '' -r -a sample_list < $output_dir/analysis/intermed/tmp_sampleids.txt
     
     # set file
-    chunk1="specimen_id,wgs_id,srr_number,wgs_date_put_on_sequencer,sequence_classification,run_id"
-    chunk2="auto_qc_outcome,estimated_coverage,genome_length,assembly_ratio_(stdev),species,mlst_ccheme_1"
+    chunk1="specimen_id,wgs_id,srr_id,wgs_date_put_on_sequencer,sequence_classification,run_id"
+    chunk2="auto_qc_outcome,estimated_coverage,genome_length,assembly_ratio_(stdev),species,mlst_scheme_1"
     chunk3="mlst_1,mlst_scheme_2,mlst_2,gamma_beta_lactam_resistance_genes,hypervirulence"
     chunk4="auto_qc_failure_reason"
     echo -e "${chunk1},${chunk2},${chunk3},${chunk4}" > $final_results 
 
     for id in "${sample_list[@]}"; do
-        echo "--$id"
         # create final result file
         specimen_id=$id
         wgs_id=`cat $wgs_results | grep $specimen_id | awk -F"," '{print $2}'`
         srr_number=`cat $ncbi_results | grep $wgs_id | awk -F"," '{print $2}'`
+        if [[ $srr_number == "" ]]; then srr_number="NO_ID"; fi
         wgs_date_put_on_sequencer=`echo $project_id | cut -f3 -d"-"`
         run_id=$project_id
         
@@ -83,7 +95,6 @@ if [[ $flag_results == "Y" ]]; then
 fi
 
 if [[ $flag_basic == "Y" ]]; then
-    AMRFinder/${metaid}_all_genes.tsv
     # sampletable
     ## generated from Phoenix
     sampletable="$analysis_dir/final_report.csv"
@@ -105,23 +116,51 @@ if [[ $flag_basic == "Y" ]]; then
     amr_reports="$intermed_dir/ar_all_genes.tsv"
     ar_predictions="$intermed_dir/ar_predictions.tsv"
     echo -e "Sample \tGene \tCoverage \tIdentity" > $ar_predictions
-    awk '{print FILENAME"\t"\$0}' $amr_reports | \
-    awk -F"\t" '{print \$1"\t"\$7"\t"\$17"\t" \$18}' | sed -s "s/_all_genes.tsv//g" > tmp_ar_predictions.tsv
+    awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' $amr_reports| sed -s "s/_all_genes.tsv//g" > tmp_ar_predictions.tsv
     cat tmp_ar_predictions.tsv | grep -v "_Coverage_of_reference_sequence" >> $ar_predictions
     rm tmp_ar_predictions.tsv
 
     # set up reports
     arRMD="$analysis_dir/reports/ar_report_basic.Rmd"
-    cp ar_report_basic.Rmd $arRMD
+    cp scripts/ar_report_basic.Rmd $arRMD
+    cp assets/odh_logo_231222.jpg $analysis_dir/reports
 
-    # change out 
+    # change out
+    micropath="//LABAUTHDC2/Shared/Micro/WGS/AR WGS/projects/$project_id"
+    intermedpath="//LABAUTHDC2/Shared/Micro/WGS/AR WGS/projects/$project_id/analysis/intermed"
+    reportpath="//LABAUTHDC2/Shared/Micro/WGS/AR WGS/projects/$project_id/analysis/reports"
+    arCONFIG="$micropath/logs/config/config_ar_report.yaml"
 	todaysdate=$(date '+%Y-%m-%d')
-    sed -i "s/REP_PROJID/$project_name/g" $arRMD
-    sed -i "s~REP_OUT~$analysis_dir/reports/~g" $arRMD
+    sed -i "s~REP_CONFIG~$arCONFIG~g" $arRMD
+    sed -i "s/REP_PROJID/$project_id/g" $arRMD
+    sed -i "s~REP_OUT~$micropath/reports/~g" $arRMD
     sed -i "s~REP_DATE~$todaysdate~g" $arRMD
-    sed -i "s~REP_ST~$intermed_dir/final_report.csv~g" $arRMD
-    sed -i "s~REP_SNP~$intermed_dir/snp_distance_matrix.tsv~g" $arRMD
-    sed -i "s~REP_TREE~$intermed_dir/core_genome.tree~g" $arRMD
-    sed -i "s~REP_CORE~$intermed_dir/core_genome_statistics.txt~g" $arRMD
-    sed -i "s~REP_AR~$intermed_dir/ar_predictions.tsv~g" $arRMD
+    sed -i "s~REP_ST~$reportpath/final_report.csv~g" $arRMD
+    sed -i "s~REP_SNP~$intermedpath/snp_distance_matrix.tsv~g" $arRMD
+    sed -i "s~REP_TREE~$intermedpath/core_genome.tree~g" $arRMD
+    sed -i "s~REP_CORE~$intermedpath/core_genome_statistics.txt~g" $arRMD
+    sed -i "s~REP_AR~$intermedpath/ar_predictions.tsv~g" $arRMD
+
+    # zip fastq
+    batch_count=`ls $ncbi_dir/*/manifest_batch_* | wc -l`
+	batch_min=1
+	
+	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
+		batch_dir="$ncbi_dir/batch_0$batch_id"
+        cd $ncbi_dir
+        tar -zcvf batch_0$batch_id.tar.gz $batch_dir/
+        rm -rf $batch_dir
+        # undo 
+        # mkdir test; tar -zxf batch_01.tar.gz --directory test
+    done
+
+    # run multiQC
+	## -d -dd 1 adds dir name to sample name
+	multiqc -f -v \
+	-c $multiqc_config \
+	$fastqc_dir \
+	-o $qcreport_dir 2>&1 | tee -a $multiqc_log
+
+    tar -zcvf $fastqc_dir.tar.gz $fastqc_dir/
+    rm -rf $fastqc_dir
 fi

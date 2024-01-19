@@ -1,0 +1,291 @@
+---
+title: "PUBLIC HEALTH WHOLE GENOME SEQUENCING ANALYSIS REPORT"
+output:
+  html_document:
+    theme: paper
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+params:
+  configFILE: "REP_CONFIG"
+  projectname: "REP_PROJID"
+  outdir: "REP_OUT"
+  date: "REP_DATE"
+  sampletable: "REP_ST"
+  snpmatrix: "REP_SNP"
+  tree: "REP_TREE"
+  cgstats: "REP_CORE"
+  arpredictions: "REP_AR"
+  testing: "N"
+---
+
+```{r libs, echo=FALSE,include=FALSE,warning=FALSE,message=FALSE}
+library(rmarkdown)
+library(argparser)
+library(yaml)
+library(ape)
+library(ggplot2)
+library(plotly)
+library(pander)
+library(kableExtra)
+library(ape)
+library(ggtree)
+library(heatmaply)
+library(phytools)
+library(DT)
+knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message=FALSE)
+
+```
+
+```{r args, echo=FALSE,warning=FALSE}
+username="S. Chill"
+reporttype="Standard"
+
+#position args
+if (params$testing=="N"){
+  projectname=params$projectname
+  outdir=params$outdir
+  configFILE=params$configFILE
+  date=params$date
+  sampletable=params$sampletable
+  snpmatrix=params$snpmatrix
+  tree=params$tree
+  cgstats=params$cgstats
+  arpredictions=params$arpredictions
+} else {
+  projectname="OH-M6588-231201"
+  outdir="OH-M6588-231201/"
+  date="12/18/23"
+  sampletable="final_report.csv"
+  snpmatrix="snp_distance_matrix.tsv"
+  tree="core_genome.tree"
+  cgstats="core_genome_statistics.txt"
+  arpredictions="ar_predictions.tsv"
+}
+```
+
+```{r prep, echo=FALSE, warning=FALSE}
+# read yaml file
+config <- read_yaml(configFILE)
+
+## set header text
+subHeaderText = paste0(config$sub.title, ": ", reporttype)
+
+## get header table
+headerDF <- data.frame(date=date,project=projectname,name=username)
+
+## get summary text
+summaryTEXT <- config$summary.paragraph
+
+## get disclaimer text
+disclaimerTEXT <- config$disclaimer.text
+
+## get methods text
+methodsTEXT <- config$methods.text
+```
+
+```{r read, echo=FALSE}
+## get sample table
+sampleDF <- read.csv2(sampletable,sep=",")
+
+# get heatmap
+snpData <- read.csv2(snpmatrix,sep='\t',check.names = F,row.names = 1)
+
+# get tree
+treepath <- tree
+
+# get cgstats
+cgstats <- read.csv2(cgstats,sep='\t',header = FALSE)
+
+# get ar-summary
+ar_summary <- read.csv2(arpredictions,sep='\t',check.names = F)
+ar_summary$Sample=gsub("_[0-9][0-9][0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary$Sample=gsub("_[0-9][0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary$Sample=gsub("_[0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary$Sample=gsub("_[0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary=ar_summary[!duplicated(ar_summary),]
+```
+
+<div class ="titlePanel">
+```{r, echo=FALSE, fig.align='left',out.height='100px',out.extra="style='margin:20px'"}
+knitr::include_graphics(config$logo)
+```
+</div>
+
+
+<div class="subtitle">
+  `r subHeaderText`
+</div>
+  
+<center>
+```{r intro}
+# create table
+colnames(headerDF) <- c("REPORT DATE","PROJECT NAME","PREPARED BY")
+
+# plot table
+pander(headerDF)
+```
+</center>
+  
+## SAMPLE INFO  {.tabset}
+`r summaryTEXT`
+
+### IDs {.tabset}
+<center>
+```{r ids, echo=FALSE}
+# https://github.com/CDCgov/phoenix/wiki/Pipeline-Overview#pipeline-qc-checks
+DT::datatable(sampleDF[,c(1:4,6,7)])
+```
+
+
+### QC {.tabset}
+<center>
+```{r qc, echo=FALSE}
+# https://github.com/CDCgov/phoenix/wiki/Pipeline-Overview#pipeline-qc-checks
+DT::datatable(sampleDF[,c(1:3,8:10,18)])
+```
+</center>
+
+  
+### SUMMARY {.tabset}
+  
+<center>
+```{r samples}
+# plot table
+DT::datatable(sampleDF[,c(1:3,5,11:17)])
+```
+</center>
+
+  
+## RELATEDNESS {.tabset}
+  
+### HEATMAP {.tabset}
+`r config$heatmap.text`
+<center>
+
+```{r heatmap}
+heatmaply(snpData,
+            cellnote=snpData,
+            cellnote_textposition = "middle center",
+            colors = viridis(n = 256, alpha = 1, begin = 1, end = 0, option = "viridis"),
+            show_dendrogram = c(FALSE, FALSE),
+            dist_method=config$heat.dist.method, label_names = c("Row", "Column", "SNPs"))
+```
+</center>
+  
+### PHYLOGENETIC TREE {.tabset}
+`r config$tree.text`
+`r if(exists('treepath') & exists('cgstats')){paste("Core Genes Identified: ",cgstats[cgstats$V1 == 'Core genes',3],'\n')}`
+`r if(exists('treepath') & exists('cgstats')){paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])}`
+
+<center>
+```{r tree, message=FALSE}
+if(exists('treepath')){
+  set.seed(42)
+  tree <- ape::read.tree(treepath)
+  if(exists('cgstats')){
+    paste("Core Genes Identified: ",cgstats[cgstats$V1 == 'Core genes',3])
+    paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])
+  }
+  
+  if(config$root.method == 'midpoint'){
+    tree <- midpoint.root(tree)
+  }
+  else if(config$root.method == 'unrooted'){
+    tree <- tree
+  }
+  else {
+    node <- match(config$root.method, tree$tip.label)
+    if(is.na(node)){
+      message('Root sample ID not found')
+      quit(save="no", status=1)
+    } else {
+      tree <- reroot(tree,node)
+    }
+  }
+  
+  # metadata
+  id <- tree$tip.label
+  
+  # group samples if we have a grouping catagory
+  if(any(!is.na(sampleDF$TreeGroup))){
+    #reorder sampleDF
+    orderedDF <- sampleDF[match(id,sampleDF$'Lab ID'),]
+    grp <- orderedDF$TreeGroup
+  }
+  else {
+    grp <- NULL
+  }
+  
+  dat <- tibble::tibble(id = id)
+  # plot tree
+  ggtree_plot <- ggtree(tree)
+  metat <- ggtree_plot$data %>%
+    dplyr::inner_join(dat, c('label' = 'id'))
+  
+  ggtree_plot <- ggtree_plot +
+    geom_point(data = metat,
+               aes(x = x,
+                   y = y,
+                   colour = grp,
+                   label = id, text = paste0(id)),show.legend = FALSE)
+  
+  
+  if(config$show.bootstrap){
+    #filter bootstrap values
+    d <- ggtree_plot$data
+    bs <- d[!d$isTip,]
+    bs$label <- as.numeric(bs$label)
+    bs <- bs[bs$label > config$bootstrap.threshold,]
+    ggtree_plot <- ggtree_plot + geom_text(data=bs,aes(label=label,),position = position_dodge2(width = 0.001))
+  }
+  
+  ggplotly(ggtree_plot, tooltip = "text")
+}
+```
+</center>
+  
+### AR GENE SUMMARY {.tabset}
+`r config$ar_gene_summary.text`
+<center>
+```{r ar_table}
+if(exists('ar_summary')){
+  
+  # determine gene consensus at 50%
+  number_of_samples=round(length(unique(ar_summary$Sample))*.5+.5,0)
+  output_df=data.frame()
+  for (geneID in unique(ar_summary$Gene)){
+    tmp_df=subset(ar_summary,Gene==geneID)
+    if (nrow(tmp_df)>number_of_samples-1){
+      if (nrow(output_df)==0){
+        output_df=tmp_df
+      } else{
+        output_df=rbind(tmp_df,output_df)
+      }
+    }
+  }
+  # strip rownames, order by gene name
+  row.names(output_df) <- NULL
+  output_df <- output_df[order(output_df$Gene),]
+  
+  # if there are consensus genes then print table
+  if (nrow(output_df)==0){
+    print("There are no genes with consensus between at least 50% of samples")
+  } else{
+    DT::datatable(output_df,
+          rownames = FALSE, 
+          extensions = 'RowGroup', 
+          options = list(rowGroup = list(dataSrc=c(1)),
+                         columnDefs = list(list(visible=FALSE, targets=c(1)))
+                         )
+          )
+  }
+}
+```
+</center>
+  
+## METHODS
+`r methodsTEXT`
+
+## DISCLAIMER
+`r disclaimerTEXT`

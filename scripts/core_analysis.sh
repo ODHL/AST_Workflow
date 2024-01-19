@@ -55,6 +55,7 @@ cleanmanifests(){
 	sed -i "s/[_-]AST//g" $1
 	sed -i "s/-$project_name_full//g" $1
 	sed -i "s/-$project_name//g" $1		
+	sed -i "s/-OH//g" $1		
 }
 
 #########################################################
@@ -275,6 +276,9 @@ if [[ $flag_analysis == "Y" ]]; then
 		if [[ ! -d $fastq_batch_dir ]]; then mkdir $fastq_batch_dir; fi
 		if [[ ! -d $pipeline_batch_dir ]]; then mkdir $pipeline_batch_dir; fi
 
+		# read text file
+		IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
+
 		#create proj tmp dir to enable multiple projects to be run simultaneously
 		project_number=`$config_basespace_cmd list projects --filter-term="${project_name_full}" | sed -n '4 p' | awk '{split($0,a,"|"); print a[3]}' | sed 's/ //g'`
 		workingdir=$pipeline_batch_dir/$project_number
@@ -282,14 +286,11 @@ if [[ $flag_analysis == "Y" ]]; then
 
 		if [[ $resume == "Y" ]]; then
 			cd $workingdir
-			message_cmd_log "----Resuming pipeline"
+			message_cmd_log "----Resuming pipeline at $workingdir"
 			pipeline_full_cmd="$analysis_cmd -resume $analysis_cmd_trailing --input $samplesheet --kraken2db $config_kraken2_db --outdir $pipeline_batch_dir --projectID $project_name_full"
 			echo "$pipeline_full_cmd"
 			$pipeline_full_cmd
 		else
-			# read text file
-			IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
-
 			# print number of lines in file without file name "<"
 			n_samples=`wc -l < $batch_manifest`
 			echo "----Batch_$batch_id ($n_samples samples): $batch_manifest"
@@ -315,7 +316,7 @@ if [[ $flag_analysis == "Y" ]]; then
 			
 			## fastq files renamed
 			for f in $fastq_batch_dir/*; do
-				new=`echo $f | sed "s/_S[0-9].*_L001//g" | sed "s/_001//g" | sed "s/[_-]AST//g" | sed "s/[_-]ASTVAL//g" | sed "s/-$project_name_full//g" | sed "s/-$project_name//g" | sed "s/_R/.R/g"`
+				new=`echo $f | sed "s/_S[0-9].*_L001//g" | sed "s/_001//g" | sed "s/[_-]ASTVAL//g" |  sed "s/[_-]AST//g" | sed "s/-$project_name_full//g" | sed "s/-$project_name//g" | sed "s/-OH//g" | sed "s/_R/.R/g"`
 				if [[ $new != $f ]]; then mv $f $new; fi
 			done
 
@@ -345,7 +346,10 @@ if [[ $flag_analysis == "Y" ]]; then
 
 		# create files for report
 		for sample_id in ${sample_list[@]}; do
-			$pipeline_batch_dir/${sample_id}/AMRFinder/${sample_id}_all_genes.tsv >> $merged_amr
+			# grab only the sampleID - inconsistent naming is a problem
+			shortID=`echo $sample_id | cut -f1 -d"-"`
+				
+			cat $pipeline_batch_dir/${shortID}/AMRFinder/${shortID}_all_genes.tsv >> $merged_amr
 		done
 
 		# log
