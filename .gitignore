@@ -27,3 +27,6 @@ hs_err_pid*
 
 # kraken
 kraken2db/
+
+# ignore large ref files; store on L drive
+tools/phoenix/assets/databases/REFSEQ_20230504_Bacteria_complete.msh.gz
