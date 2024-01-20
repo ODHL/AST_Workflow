@@ -344,7 +344,7 @@ if [[ $flag_analysis == "Y" ]]; then
 		cat $pipeline_batch_dir/*Phoenix* >> $merged_pipeline
 		cp $pipeline_batch_dir/pipeline_info/* $log_dir/pipeline
 		cp $pipeline_batch_dir/*/qc_stats/* $qc_dir
-		cp $pipeline_batch_dir/*/prokka/*gff $prokka_dir/${project_name}_${batch_id}.gff
+		cp $pipeline_batch_dir/*/annotation/*gff $prokka_dir
 
 		# create files for report
 		for sample_id in ${sample_list[@]}; do

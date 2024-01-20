@@ -170,7 +170,7 @@ elif [[ "$pipeline" == "init" ]]; then
 	
         #### tree
         dir_list=(tree)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/intermed/$pd ]]; then mkdir -p $analysis_dir/tree/$pd; fi; done
+        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/intermed/tree/$pd ]]; then mkdir -p $analysis_dir/intermed/tree/$pd; fi; done
 
         #### qc
         dir_list=(data)
