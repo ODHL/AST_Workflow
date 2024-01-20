@@ -74,17 +74,14 @@ intermed_dir=$analysis_dir/intermed
 fasta_dir=$analysis_dir/fasta
 qc_dir=$analysis_dir/qc/data
 ncbi_dir=$output_dir/ncbi/data
+prokka_dir=$intermed/prokka
 
 ## tmp dir
 tmp_dir=$output_dir/tmp
 
 # set files
 merged_pipeline=$intermed_dir/pipeline_results.tsv
-merged_phoenix=$intermed_dir/pipeline_results_griph.tsv
 merged_amr=$intermed_dir/ar_all_genes.tsv
-merged_snpdist=$intermed_dir/snp_distance_matrix.tsv
-merged_tree=$intermed_dir/core_genome.tree
-merged_roary=$intermed_dir/core_genome_statistics.txt
 sample_id_file=$log_dir/manifests/sample_ids.txt
 
 # set variables
@@ -99,6 +96,13 @@ wgsID_script=$config_wgsID_script
 
 # set project shorthand
 project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
+
+# set command 
+if [[ $resume == "Y" ]]; then
+	analysis_cmd=`echo $config_analysis_cmd -resume`
+else
+	analysis_cmd=`echo $config_analysis_cmd`
+fi
 #############################################################################################
 # LOG INFO TO CONFIG
 #############################################################################################
@@ -225,24 +229,24 @@ if [[ $flag_batch == "Y" ]]; then
 		mkdir -p $log_dir/manifests/save
 		mv $log_dir/manifests/b*.txt $log_dir/manifests/save
 		batch_manifest=$log_dir/manifests/save/batch_01.txt
-		head -4 $batch_manifest > $log_dir/manifests/batch_01.txt
-		tail -2 $batch_manifest > $log_dir/save/batch_02.txt
+		head -2 $batch_manifest > $log_dir/manifests/batch_01.txt
+		#tail -2 $batch_manifest > $log_dir/manifests/batch_02.txt
 
 		# fix samplesheet
 		mv $log_dir/manifests/samplesheet* $log_dir/manifests/save
 		samplesheet=$log_dir/manifests/save/samplesheet_01.csv
-		head -5 $samplesheet > $log_dir/manifests/samplesheet_01.csv
+		head -3 $samplesheet > $log_dir/manifests/samplesheet_01.csv
 		head -1 $samplesheet > $log_dir/manifests/samplesheet_02.csv
-		tail -2 $samplesheet >> $log_dir/manifests/samplesheet_02.csv
-		sed -i "s/batch_1/batch_2/g" $log_dir/manifests/samplesheet_02.csv
+		#tail -2 $samplesheet >> $log_dir/manifests/samplesheet_02.csv
+		#sed -i "s/batch_1/batch_2/g" $log_dir/manifests/samplesheet_02.csv
 
 		# update sampleids files
 		mv $log_dir/manifests/sample_ids.txt $log_dir/manifests/save
 		cat $log_dir/manifests/batch_01.txt > $log_dir/manifests/sample_ids.txt
-		cat $log_dir/manifests/batch_02.txt >> $log_dir/manifests/sample_ids.txt
+		#cat $log_dir/manifests/batch_02.txt >> $log_dir/manifests/sample_ids.txt
 
 		# set samples and batch
-		sample_final=6
+		sample_final=4
 		batch_count=2
 	fi
 
@@ -284,10 +288,12 @@ if [[ $flag_analysis == "Y" ]]; then
 		workingdir=$pipeline_batch_dir/$project_number
 		if [[ ! -d $workingdir ]]; then mkdir $workingdir; fi
 
+		# set command
+		pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --kraken2db $config_kraken2_db --outdir $pipeline_batch_dir --projectID $project_name_full"
+
 		if [[ $resume == "Y" ]]; then
 			cd $workingdir
 			message_cmd_log "----Resuming pipeline at $workingdir"
-			pipeline_full_cmd="$analysis_cmd -resume $analysis_cmd_trailing --input $samplesheet --kraken2db $config_kraken2_db --outdir $pipeline_batch_dir --projectID $project_name_full"
 			echo "$pipeline_full_cmd"
 			$pipeline_full_cmd
 		else
@@ -327,7 +333,6 @@ if [[ $flag_analysis == "Y" ]]; then
 			
 			#run NEXTLFOW
 			cd $workingdir
-			pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --kraken2db $config_kraken2_db --outdir $pipeline_batch_dir --projectID $project_name_full"
 			echo "$pipeline_full_cmd"
 			$pipeline_full_cmd
 		fi
@@ -337,12 +342,9 @@ if [[ $flag_analysis == "Y" ]]; then
 		#############################################################################################	
 		# add to  master pipeline results
 		cat $pipeline_batch_dir/*Phoenix* >> $merged_pipeline
-		cat $pipeline_batch_dir/*GRiPHin_Summary.tsv >> $merged_phoenix
 		cp $pipeline_batch_dir/pipeline_info/* $log_dir/pipeline
 		cp $pipeline_batch_dir/*/qc_stats/* $qc_dir
-		cat $pipeline_batch_dir/CFSAN/snp_distance_matrix.tsv >> $merged_snpdist
-		cat $pipeline_batch_dir/TREE/core_genome.tree >> $merged_tree
-		cat $pipeline_batch_dir/ROARY/core_genome_statistics.txt >> $merged_roary
+		cp $pipeline_batch_dir/*/prokka/*gff $prokka_dir/${project_name}_${batch_id}.gff
 
 		# create files for report
 		for sample_id in ${sample_list[@]}; do

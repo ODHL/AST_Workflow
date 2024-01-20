@@ -9,7 +9,8 @@ ar_dir: "/home/ubuntu/tools/ar_report_generator"
 
 # analysis commands
 analysis_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/AR_Workflow/tools/phoenix/main.nf"
-analysis_cmd_trailing: "-profile docker -entry PHOENIX --max_memory 7.GB --max_cpus 4"
+analysis_cmd_trailing: "-profile docker -entry PHOENIX_SLIM --max_memory 7.GB --max_cpus 4"
+tree_cmd_trailing: "-profile docker -entry TREE --max_memory 7.GB --max_cpus 4"
 
 # ref files
 ref_fasta: "/home/ubuntu/refs/ASM211692v1.fasta"

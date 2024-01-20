@@ -127,6 +127,9 @@ if [[ $pipeline == "phase1" ]]; then
 	# run through analysis workflow
         bash run_workflow.sh -p analysis -n $project_id -s ALL
 
+        # run through tree workflow
+        bash run_workflow.sh -p tree -n $project_id -s ALL
+
         # create WGS ids
         bash run_workflow.sh -p wgs -n $project_id
 
@@ -165,6 +168,10 @@ elif [[ "$pipeline" == "init" ]]; then
         dir_list=(intermed qc reports)
         for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi; done
 	
+        #### tree
+        dir_list=(tree)
+        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/intermed/$pd ]]; then mkdir -p $analysis_dir/tree/$pd; fi; done
+
         #### qc
         dir_list=(data)
         for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/qc/$pd ]]; then mkdir -p $analysis_dir/qc/$pd; fi; done
@@ -268,5 +275,20 @@ elif [[ "$pipeline" == "cleanup" ]]; then
 # Run validation
 #############################################################################################
 elif [[ "$pipeline" == "validation" ]]; then
-        bash validation/ast_validation.sh $subworkflow $project_name_full $resume $output_dir "${pipeline_config}" $pipeline_log
+        bash validation/ast_validation.sh \
+                $subworkflow \
+                $project_name_full \
+                $resume $output_dir \
+                "${pipeline_config}" \
+                $pipeline_log
+#############################################################################################
+# Run TREE
+#############################################################################################
+elif [[ "$pipeline" == "tree" ]]; then
+        bash scripts/build_tree.sh \
+                "${output_dir}" \
+                "${project_name_full}" \
+                "${pipeline_config}" \
+                "${pipeline_log}" \
+                "${resume}"
 fi

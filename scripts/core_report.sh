@@ -21,6 +21,7 @@ multiqc_config=$log_dir/config/config_multiqc.yaml
 fastqc_dir=$analysis_dir/qc/data
 qcreport_dir=$analysis_dir/qc
 multiqc_log=$log_dir/pipeline_log.txt
+
 ##########################################################
 # Set flags
 #########################################################
