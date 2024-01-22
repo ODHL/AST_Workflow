@@ -20,9 +20,7 @@ def multiqc_report = []
     CONFIG FILES
 ========================================================================================
 */
-
-ch_multiqc_config        = file("$projectDir/assets/multiqc_config.yaml", checkIfExists: true)
-ch_multiqc_custom_config = params.multiqc_config ? Channel.fromPath(params.multiqc_config) : Channel.empty()
+ch_snp_config            = file("$projectDir/assets/snppipipeline.conf", checkIfExists: true)
 
 /*
 ========================================================================================
@@ -31,6 +29,7 @@ ch_multiqc_custom_config = params.multiqc_config ? Channel.fromPath(params.multi
 */
 
 include { ASSET_CHECK                    } from '../modules/local/asset_check'
+include { CFSAN                          } from '../modules/local/cfsan' // Run CFSAN-SNP Pipeline
 include { ROARY                          } from '../modules/local/roary' // Perform core genome alignment using Roary
 include { TREE                           } from '../modules/local/core_genome_tree' //Infer ML tree from core genome alignment using IQ-TREE
 
@@ -39,8 +38,7 @@ include { TREE                           } from '../modules/local/core_genome_tr
     IMPORT LOCAL SUBWORKFLOWS
 ========================================================================================
 */
-
-include { CREATE_INPUT_CHANNEL                     } from '../subworkflows/local/create_input_tree_channel'
+include { INPUT_CHECK                    } from '../subworkflows/local/input_check_tree'
 
 /*
 ========================================================================================
@@ -77,33 +75,39 @@ def create_empty_ch(input_for_meta) { // We need meta.id associated with the emp
 ========================================================================================
 */
 
-workflow CREATE_TREE {
+workflow BUILD_TREE {
     take:
         ch_input
-        ch_input_indir
 
     main:
-        ch_versions = Channel.empty() // Used to collect the software versions
         // Allow outdir to be relative
         outdir_path = Channel.fromPath(params.outdir, relative: true)
 
-        CREATE_INPUT_CHANNEL (
-            ch_input_indir, ch_input, ch_versions
+        INPUT_CHECK (
+            ch_input
         )
-        ch_versions = ch_versions.mix(CREATE_INPUT_CHANNEL.out.versions)
+        
+        // Generate SNP dist matrix
+        CFSAN (
+            INPUT_CHECK.out.fqs.collect(),
+            params.ardb,
+            Channel.from(ch_snp_config)
+        )
 
-        // Generate core genome statistics
-        ROARY (
-            CREATE_INPUT_CHANNEL.out.gff_ch.collect(), 
-        )
+        // // Generate core genome statistics
+        // ROARY (
+        //     INPUT_CHECK.out.gffs.collect(), 
+        // )
 
-        // Generate core genome tree
-        TREE (
-            ROARY.out.aln
-        )
+        // // Generate core genome tree
+        // TREE (
+        //     ROARY.out.aln
+        // )
 
     emit:
-        tree        = TREE.out.tree
+        distmatrix  = CFSAN.out.distmatrix
+        // core_stats  = ROARY.out.core_stats
+        // tree        = TREE.out.tree
 }
 
 /*

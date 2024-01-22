@@ -33,8 +33,6 @@ process CREATE_SUMMARY_LINE {
         -q $quast_report \\
         $trimmed_qc_data \\
         -a $ar_gamma_file \\
-        -v $hypervirulence_gamma_file \\
-        -p $pf_gamma_file \\
         -r $ratio_file \\
         -m $mlst_file \\
         -u $amr_report \\

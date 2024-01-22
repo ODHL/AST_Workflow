@@ -27,13 +27,13 @@ if (params.coverage < 30) { exit 1, 'The minimum coverage allowed for QA/QC purp
 ========================================================================================
 */
 
-include { PHOENIX_EXTERNAL_SLIM       } from './workflows/phoenix_slim'
+include { PHOENIX_EXTERNAL_SLIM  } from './workflows/phoenix_slim'
 include { PHOENIX_EXTERNAL       } from './workflows/phoenix'
 include { PHOENIX_EXQC           } from './workflows/cdc_phoenix'
 include { SCAFFOLDS_EXTERNAL     } from './workflows/scaffolds'
 include { SCAFFOLDS_EXQC         } from './workflows/cdc_scaffolds'
 include { SRA_PREP               } from './workflows/sra_prep'
-include { TREE               } from './workflows/create_tree'
+include { BUILD_TREE                   } from './workflows/build_tree'
 include { VALIDATION             } from './workflows/validation'
 
 //
@@ -117,21 +117,15 @@ workflow VALAR {
 // WORKFLOW: Create tree for inputs
 //
 workflow TREE {
-    // Validate input parameters
-    if (params.indir != null ) { // if no samplesheet is passed, but an input directory is given
-        ch_input = null //keep samplesheet input null if not passed
-        def checkPathParamList = [ params.indir ]
-        for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
-        ch_input_indir = Channel.fromPath(params.indir, relative: true)
-    } else { // if no samplesheet is passed and no input directory is given
-        exit 1, 'For -entry TREE: You need a directory!' 
-    }
+    if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry PHOENIX: Input samplesheet not specified!' }
 
     main:
-        CREATE_TREE ( ch_input, ch_input_indir )
+        BUILD_TREE ( ch_input )
 
     emit:
-        tree            =   CREATE_TREE.out.tree
+        distmatrix  = BUILD_TREE.out.distmatrix
+        // core_stats  = BUILD_TREE.out.core_stats
+        // tree        = BUILD_TREE.out.tree
 }
 
 //

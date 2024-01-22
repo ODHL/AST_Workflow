@@ -15,6 +15,13 @@ def summary_params = NfcoreSchema.paramsSummaryMap(workflow, params)
 // Info required for completion email and summary
 def multiqc_report = []
 
+// Groovy funtion to make [ meta.id, [] ] - just an empty channel
+def create_empty_ch(input_for_meta) { // We need meta.id associated with the empty list which is why .ifempty([]) won't work
+    meta_id = input_for_meta[0]
+    output_array = [ meta_id, [] ]
+    return output_array
+}
+
 /*
 ========================================================================================
     CONFIG FILES

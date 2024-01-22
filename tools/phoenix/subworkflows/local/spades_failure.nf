@@ -33,7 +33,7 @@ workflow SPADES_WF {
 
         // Add in full path to outdir into the channel so each sample has a the path to go with it. If you don't do this then only one sample goes through pipeline
         passing_reads_ch = passing_reads_ch.combine(outdir_path)
-        passing_reads_ch.view()
+
         // Assemblying into scaffolds by passing filtered paired in reads and unpaired reads
         SPADES (
             passing_reads_ch, extended_qc

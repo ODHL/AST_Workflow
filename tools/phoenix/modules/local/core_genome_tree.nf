@@ -12,7 +12,7 @@ process TREE {
   script:
   def args = task.ext.args ?: ''
   """
-  numGenomes=`grep -v '>' ${aln} | sed '/^\$/d' | wc -l`
+  numGenomes=`grep -o -e '^>.*' ${aln} | wc -l`
   if [ \$numGenomes -gt 3 ]; then
     iqtree -nt AUTO -s ${aln} -keep-ident -m $args -bb 1000
     mv core_gene_alignment.aln.contree core_genome.tree

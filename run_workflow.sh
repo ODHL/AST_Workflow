@@ -290,5 +290,6 @@ elif [[ "$pipeline" == "tree" ]]; then
                 "${project_name_full}" \
                 "${pipeline_config}" \
                 "${pipeline_log}" \
-                "${resume}"
+                "${resume}" \
+                "${subworkflow}"
 fi

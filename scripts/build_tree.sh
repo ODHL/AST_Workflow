@@ -40,11 +40,13 @@ eval $(parse_yaml ${pipeline_config} "config_")
 # set dirs
 log_dir=$output_dir/logs
 intermed_dir=$output_dir/analysis/intermed
-prokka_dir=$output_dir/analysis/intermed/prokka
-workingdir=$output_dir/pipeline/working
+tree_dir=$output_dir/analysis/intermed/tree
+
 pipeline_dir=$output_dir/pipeline
-if [[ ! -d $workingdir ]]; then mkdir $workingdir; fi
+workingdir=$pipeline_dir/working
 prokka_merged_dir=$pipeline_dir/prokka
+if [[ ! -d $workingdir ]]; then mkdir $workingdir; fi
+if [[ ! -d $prokka_merged_dir ]]; then mkdir $prokka_merged_dir; fi
 
 # set variables
 ODH_version=$config_ODH_version
@@ -52,11 +54,10 @@ phoenix_version=$config_phoenix_version
 dryad_version=$config_dryad_version
 
 # set files
-prokka_merged=$prokka_merged_dir/prokka_merged.gff
-merged_snpdist=$intermed_dir/snp_distance_matrix.tsv
-merged_tree=$intermed_dir/core_genome.tree
-merged_roary=$intermed_dir/core_genome_statistics.txt
-
+merged_tree=$intermed_dir/tree/core_genome.tree
+merged_roary=$intermed_dir/tree/core_genome_statistics.txt
+samplesheet=$log_dir/manifests/samplesheet_gff.csv	
+	
 # set cmd and log
 if [[ $resume == "Y" ]]; then
 	message_cmd_log "----Resuming pipeline at $workingdir"
@@ -82,9 +83,29 @@ message_cmd_log "Pipeline version: $ODH_version"
 # Analysis
 #############################################################################################
 if [[ $flag_prep == "Y" ]]; then
-	for f in $prokka_dir; do
-		cat $f >> $prokka_merged
-	done		
+	# create samplesheet
+	if [[ -f $samplesheet ]]; then rm $samplesheet; fi
+	echo "sample,gff,fq1,fq2" > $samplesheet
+
+	message_cmd_log "--Prepping GFF files"
+	# create sample log
+	if [[ -f sample_list.txt ]]; then rm sample_list.txt; fi
+	for f in $tree_dir/*gff; do
+		filename="${f##*/}"
+		sample_id=`echo $filename | cut -f1 -d"."`
+		echo $sample_id >> sample_list.txt
+	done
+	IFS=$'\n' read -d '' -r -a sample_list < sample_list.txt
+
+	for f in ${sample_list[@]}; do
+		gff="$tree_dir/$sample_id.gff"
+		fq1="$tree_dir/${sample_id}_1.trim.fastq.gz"
+		fq2="$tree_dir/${sample_id}_2.trim.fastq.gz"
+
+		# add to the samplesheet
+        echo "${sample_id},$gff,$fq1,$fq2" >> $samplesheet
+	done
+	cat $samplesheet
 fi
 
 if [[ $flag_analysis == "Y" ]]; then
@@ -93,7 +114,7 @@ if [[ $flag_analysis == "Y" ]]; then
 
     # Run pipeline
     cd $workingdir
-	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --indir $prokka_merged_dir --outdir $pipeline_dir --projectID $unique_id"
+	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --outdir $pipeline_dir --projectID $unique_id"
 	echo "$pipeline_full_cmd"
 	$pipeline_full_cmd
 
@@ -111,7 +132,6 @@ if [[ $flag_analysis == "Y" ]]; then
 fi
 
 if [[ $flag_report == "Y" ]]; then
-		cat $pipeline_batch_dir/CFSAN/snp_distance_matrix.tsv >> $merged_snpdist
-		cat $pipeline_batch_dir/TREE/core_genome.tree >> $merged_tree
-		cat $pipeline_batch_dir/ROARY/core_genome_statistics.txt >> $merged_roary
+	cp $pipeline_batch_dir/ROARY/core_genome_statistics.txt >> $merged_roary
+	cat $pipeline_batch_dir/TREE/core_genome.tree >> $merged_tree
 fi

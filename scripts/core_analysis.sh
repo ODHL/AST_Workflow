@@ -74,7 +74,7 @@ intermed_dir=$analysis_dir/intermed
 fasta_dir=$analysis_dir/fasta
 qc_dir=$analysis_dir/qc/data
 ncbi_dir=$output_dir/ncbi/data
-prokka_dir=$intermed/prokka
+tree_dir=$intermed_dir/tree
 
 ## tmp dir
 tmp_dir=$output_dir/tmp
@@ -344,7 +344,8 @@ if [[ $flag_analysis == "Y" ]]; then
 		cat $pipeline_batch_dir/*Phoenix* >> $merged_pipeline
 		cp $pipeline_batch_dir/pipeline_info/* $log_dir/pipeline
 		cp $pipeline_batch_dir/*/qc_stats/* $qc_dir
-		cp $pipeline_batch_dir/*/annotation/*gff $prokka_dir
+		cp $pipeline_batch_dir/*/annotation/*gff $tree_dir
+		cp $pipeline_batch_dir/*/fastp/*gz $tree_dir
 
 		# create files for report
 		for sample_id in ${sample_list[@]}; do

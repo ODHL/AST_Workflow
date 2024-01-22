@@ -57,7 +57,6 @@ include { CREATE_SUMMARY_LINE            } from '../modules/local/phoenix_summar
 include { FETCH_FAILED_SUMMARIES         } from '../modules/local/fetch_failed_summaries'
 include { GATHER_SUMMARY_LINES           } from '../modules/local/phoenix_summary'
 include { GRIPHIN                        } from '../modules/local/griphin'
-include { CFSAN                          } from '../modules/local/cfsan' // Run CFSAN-SNP Pipeline
 
 /*
 ========================================================================================

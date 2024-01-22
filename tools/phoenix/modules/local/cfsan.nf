@@ -4,13 +4,13 @@ process CFSAN {
   container 'staphb/cfsan-snp-pipeline:2.2.1'
   
   input:
-  file(reads)
+  path(reads)
   path(db)
   path(config)
 
   output:
-  path('*snp_distance_matrix.tsv')           , emit: distmatrix
-  path('*snpma.fasta')           , emit: snpma
+  path('*snp_distance_matrix.tsv')            , emit: distmatrix
+  path('*snpma.fasta')                        , emit: snpma
 
   // cfsan requires each sample to be in a subfolder
   script:

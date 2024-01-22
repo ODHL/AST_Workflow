@@ -7,7 +7,7 @@ process ROARY {
     numGenomes = 0
   
     input:
-    file(gff)
+    path(gff)
 
     output:
     path('*.aln')                                 , emit: aln
