@@ -4,7 +4,7 @@ process CFSAN {
   container 'staphb/cfsan-snp-pipeline:2.2.1'
   
   input:
-  path(reads)
+  path(inputdir)
   path(db)
   path(config)
 
@@ -15,13 +15,7 @@ process CFSAN {
   // cfsan requires each sample to be in a subfolder
   script:
   """
-  for rid in ${reads}; do
-    prefix=`echo \$rid | cut -f1 -d"_"`
-    read=`echo \$rid | cut -f2 -d"_" | cut -f1 -d"."`
-    mkdir -p input_reads/\$prefix
-    mv \$rid input_reads/\$prefix/\${prefix}_\${read}.fastq.gz
-  done
 
-  cfsan_snp_pipeline run ${db} -c ${config} -o . -s input_reads
+  cfsan_snp_pipeline run ${db} -c ${config} -o . -s $inputdir
   """
 }

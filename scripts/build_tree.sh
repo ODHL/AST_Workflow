@@ -82,6 +82,21 @@ message_cmd_log "Pipeline version: $ODH_version"
 #############################################################################################
 # Analysis
 #############################################################################################
+handle_fq(){
+	in_fq=$1
+	in_fqID=$2
+	in_treedir=$3
+
+	if [[ ! -f $in_fq/$in_fqID ]]; then
+		if [[ -f $in_treedir/$in_fqID ]]; then 
+			mv $in_treedir/$in_fqID $in_fq/$in_fqID
+		else 
+			echo "missing $in_fqID"
+			exit
+		fi
+	fi	
+
+}
 if [[ $flag_prep == "Y" ]]; then
 	# create samplesheet
 	if [[ -f $samplesheet ]]; then rm $samplesheet; fi
@@ -95,17 +110,29 @@ if [[ $flag_prep == "Y" ]]; then
 		sample_id=`echo $filename | cut -f1 -d"."`
 		echo $sample_id >> sample_list.txt
 	done
+
+	# read text file
 	IFS=$'\n' read -d '' -r -a sample_list < sample_list.txt
 
-	for f in ${sample_list[@]}; do
+	# move fq's to CFSAN dir
+	## create samplesheet
+	for sample_id in ${sample_list[@]}; do
 		gff="$tree_dir/$sample_id.gff"
-		fq1="$tree_dir/${sample_id}_1.trim.fastq.gz"
-		fq2="$tree_dir/${sample_id}_2.trim.fastq.gz"
+		fq1="${sample_id}_1.trim.fastq.gz"
+		fq2="${sample_id}_2.trim.fastq.gz"
+
+		fq_dest="$tree_dir/input_dir/$sample_id"
+		if [[ ! -d $fq_dest ]]; then mkdir -p $fq_dest; fi
+
+		handle_fq $fq_dest $fq1 $tree_dir
+		handle_fq $fq_dest $fq2 $tree_dir
 
 		# add to the samplesheet
         echo "${sample_id},$gff,$fq1,$fq2" >> $samplesheet
 	done
 	cat $samplesheet
+
+	ls $tree_dir/input_dir/*
 fi
 
 if [[ $flag_analysis == "Y" ]]; then
@@ -114,7 +141,7 @@ if [[ $flag_analysis == "Y" ]]; then
 
     # Run pipeline
     cd $workingdir
-	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --outdir $pipeline_dir --projectID $unique_id"
+	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --outdir $pipeline_dir --treedir $tree_dir/input_dir --projectID $unique_id"
 	echo "$pipeline_full_cmd"
 	$pipeline_full_cmd
 

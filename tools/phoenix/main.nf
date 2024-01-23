@@ -124,8 +124,8 @@ workflow TREE {
 
     emit:
         distmatrix  = BUILD_TREE.out.distmatrix
-        // core_stats  = BUILD_TREE.out.core_stats
-        // tree        = BUILD_TREE.out.tree
+        core_stats  = BUILD_TREE.out.core_stats
+        tree        = BUILD_TREE.out.tree
 }
 
 //

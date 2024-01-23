@@ -89,25 +89,25 @@ workflow BUILD_TREE {
         
         // Generate SNP dist matrix
         CFSAN (
-            INPUT_CHECK.out.fqs.collect(),
+            params.treedir,
             params.ardb,
             Channel.from(ch_snp_config)
         )
 
-        // // Generate core genome statistics
-        // ROARY (
-        //     INPUT_CHECK.out.gffs.collect(), 
-        // )
+        // Generate core genome statistics
+        ROARY (
+            INPUT_CHECK.out.gffs.collect(), 
+        )
 
-        // // Generate core genome tree
-        // TREE (
-        //     ROARY.out.aln
-        // )
+        // Generate core genome tree
+        TREE (
+            ROARY.out.aln
+        )
 
     emit:
         distmatrix  = CFSAN.out.distmatrix
-        // core_stats  = ROARY.out.core_stats
-        // tree        = TREE.out.tree
+        core_stats  = ROARY.out.core_stats
+        tree        = TREE.out.tree
 }
 
 /*
