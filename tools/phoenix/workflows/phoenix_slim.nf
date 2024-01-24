@@ -139,17 +139,6 @@ workflow PHOENIX_EXTERNAL_SLIM {
         )
         ch_versions = ch_versions.mix(FASTP_TRIMD.out.versions)
 
-        //////////////////////////////
-        // ADD IN
-        //////////////////////////////
-        // First remove metadata from tuple, then generate SNP dist matrix
-        CFSAN (
-            FASTP_TRIMD.out.readsonly.collect(),
-            params.ardb,
-            Channel.from(ch_snp_config)
-        )
-        //////////////////////////////
-
         // Rerun on unpaired reads to get stats, nothing removed
         FASTP_SINGLES (
             FASTP_TRIMD.out.reads_fail
@@ -390,13 +379,9 @@ workflow PHOENIX_EXTERNAL_SLIM {
         ch_versions = ch_versions.mix(GATHER_SUMMARY_LINES.out.versions)
     
     emit:
-        // scaffolds        = BBMAP_REFORMAT.out.filtered_scaffolds
-        // trimmed_reads    = FASTP_TRIMD.out.reads
-        // mlst             = DO_MLST.out.checked_MLSTs
-        // amrfinder_report = AMRFINDERPLUS_RUN.out.report
-        // gamma_ar         = GAMMA_AR.out.gamma
-        // summary_report   = GATHER_SUMMARY_LINES.out.summary_report
-        snp_distance_matrix = CFSAN.out.distmatrix
+        trimmed_reads    = FASTP_TRIMD.out.reads
+        gamma_ar         = GAMMA_AR.out.gamma
+        summary_report   = GATHER_SUMMARY_LINES.out.summary_report
 }
 
 /*

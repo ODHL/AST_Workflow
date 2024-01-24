@@ -77,13 +77,9 @@ workflow PHOENIX_SLIM {
     main:
         PHOENIX_EXTERNAL_SLIM ( ch_input, ch_versions, true )
     emit:
-        // scaffolds        = PHOENIX_EXTERNAL.out.scaffolds
-        // trimmed_reads    = PHOENIX_EXTERNAL.out.trimmed_reads
-        // mlst             = PHOENIX_EXTERNAL.out.mlst
-        // amrfinder_report = PHOENIX_EXTERNAL.out.amrfinder_report
-        // gamma_ar         = PHOENIX_EXTERNAL.out.gamma_ar
-        // summary_report   = PHOENIX_EXTERNAL.out.summary_report
-        snp_distance_matrix = PHOENIX_EXTERNAL_SLIM.out.snp_distance_matrix
+        trimmed_reads    = PHOENIX_EXTERNAL_SLIM.out.trimmed_reads
+        gamma_ar         = PHOENIX_EXTERNAL_SLIM.out.gamma_ar
+        summary_report   = PHOENIX_EXTERNAL_SLIM.out.summary_report
 }
 
 //

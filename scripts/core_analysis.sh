@@ -340,37 +340,43 @@ if [[ $flag_analysis == "Y" ]]; then
 		#############################################################################################
 		# Reporting
 		#############################################################################################	
-		# add to  master pipeline results
-		cat $pipeline_batch_dir/*Phoenix* >> $merged_pipeline
-		cp $pipeline_batch_dir/pipeline_info/* $log_dir/pipeline
-		cp $pipeline_batch_dir/*/qc_stats/* $qc_dir
-		cp $pipeline_batch_dir/*/annotation/*gff $tree_dir
-		cp $pipeline_batch_dir/*/fastp/*gz $tree_dir
+		# check the pipeline has completed
+		if [[ -f $pipeline_batch_dir/*Phoenix* ]]; then 
+				# add to  master pipeline results
+				cat $pipeline_batch_dir/*Phoenix* >> $merged_pipeline
+				cp $pipeline_batch_dir/pipeline_info/* $log_dir/pipeline
+				cp $pipeline_batch_dir/*/qc_stats/* $qc_dir
+				cp $pipeline_batch_dir/*/annotation/*gff $tree_dir
+				cp $pipeline_batch_dir/*/fastp/*gz $tree_dir
 
-		# create files for report
-		for sample_id in ${sample_list[@]}; do
-			# grab only the sampleID - inconsistent naming is a problem
-			shortID=`echo $sample_id | cut -f1 -d"-"`
-				
-			cat $pipeline_batch_dir/${shortID}/AMRFinder/${shortID}_all_genes.tsv >> $merged_amr
-		done
+				# create files for report
+				for sample_id in ${sample_list[@]}; do
+					# grab only the sampleID - inconsistent naming is a problem
+					shortID=`echo $sample_id | cut -f1 -d"-"`
+						
+					cat $pipeline_batch_dir/${shortID}/AMRFinder/${shortID}_all_genes.tsv >> $merged_amr
+				done
 
-		# log
-    	echo "-------Ending time: `date`" >> $pipeline_log
-		echo "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
+				# log
+				echo "-------Ending time: `date`" >> $pipeline_log
+				echo "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 
-		#############################################################################################
-		# FASTQ
-		#############################################################################################	
-		cp $pipeline_batch_dir/*.gz $ncbi_dir
+			#############################################################################################
+			# FASTQ
+			#############################################################################################	
+			cp $pipeline_batch_dir/*.gz $ncbi_dir
 
-		#############################################################################################
-		# CLEANUP
-		#############################################################################################	
-		#remove intermediate files
-		if [[ $flag_cleanup == "Y" ]]; then
-			sudo rm -r --force $pipeline_batch_dir
-			sudo rm -r --force $fastq_batch_dir
+			#############################################################################################
+			# CLEANUP
+			#############################################################################################	
+			#remove intermediate files
+			if [[ $flag_cleanup == "Y" ]]; then
+				sudo rm -r --force $pipeline_batch_dir
+				sudo rm -r --force $fastq_batch_dir
+			fi
+		else
+			message_cmd_log "The pipeline failed `date`"
+			exit
 		fi
 	done
 fi

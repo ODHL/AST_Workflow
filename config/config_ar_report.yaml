@@ -37,7 +37,7 @@ disclaimer.text: |
 heatmap.text: |
   The number of Single Nucleotide Polymorphisms (SNPs) between each sample is shown on the heatmap below. The samples are ordered based on the Euclidean distance between each sample.
 tree.text: |
-  Phylogenetic trees visualize the relatedness and genetic diversity of samples. Closely related samples will generally share a recent common ancestor and a small amount of horizontal distance on the tree.
+  Phylogenetic trees visualize the relatedness and genetic diversity of samples. Closely related samples will generally share a recent common ancestor. Here a cladogram is used to illustrate relationships, where nodes are labeled with degree of similarity, but where the horizontal lines are not representative of lineage.
 ar_gene_summary.text: |
   This report shows a summary of all antimicrobial resistance genes detected using the ODH [AR pipeline](https://github.com/ODHL/AR_Workflow).
 matrix.text: |

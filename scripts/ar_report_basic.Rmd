@@ -33,6 +33,8 @@ library(ggtree)
 library(heatmaply)
 library(phytools)
 library(DT)
+library(RColorBrewer)
+library(ggpubr)
 knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message=FALSE)
 
 ```
@@ -91,6 +93,17 @@ sampleDF <- read.csv2(sampletable,sep=",")
 # get heatmap
 snpData <- read.csv2(snpmatrix,sep='\t',check.names = F,row.names = 1)
 
+# create species col list
+col_pal=brewer.pal(n = 8, name = "Dark2")
+species_colors=data.frame(unique(sampleDF$species))
+for (rid in rownames(species_colors)){
+  species_colors[rid,"colorID"]=col_pal[as.numeric(rid)]
+}
+colnames(species_colors)=c("species","colID")
+
+# add col metadata
+sampleDF=merge(sampleDF,species_colors, by.x="species", by.y="species")
+
 # get tree
 treepath <- tree
 
@@ -104,6 +117,7 @@ ar_summary$Sample=gsub("_[0-9][0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
 ar_summary$Sample=gsub("_[0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
 ar_summary$Sample=gsub("_[0-9]_length_[0-9]*","",ar_summary$Sample)
 ar_summary=ar_summary[!duplicated(ar_summary),]
+unique(ar_summary$Sample)
 ```
 
 <div class ="titlePanel">
@@ -164,12 +178,23 @@ DT::datatable(sampleDF[,c(1:3,5,11:17)])
 <center>
 
 ```{r heatmap}
+rowlabels=as.data.frame(rownames(snpData))
+colnames(rowlabels)="specimen_id"
+rowlabels=merge(rowlabels,sampleDF[,c("specimen_id","species")])
+
+collabels=as.data.frame(colnames(snpData))
+colnames(collabels)="specimen_id"
+collabels=merge(collabels,sampleDF[,c("specimen_id","species")])
+
 heatmaply(snpData,
-            cellnote=snpData,
-            cellnote_textposition = "middle center",
-            colors = viridis(n = 256, alpha = 1, begin = 1, end = 0, option = "viridis"),
-            show_dendrogram = c(FALSE, FALSE),
-            dist_method=config$heat.dist.method, label_names = c("Row", "Column", "SNPs"))
+          cellnote=snpData,
+          cellnote_size=8,
+          cellnote_textposition = "middle center",
+          col_side_colors = collabels$species,
+          row_side_colors = rowlabels$species,
+          colors = viridis(n = 256, alpha = 1, begin = 1, end = 0, option = "viridis"),
+          show_dendrogram = c(TRUE, FALSE),
+          dist_method=config$heat.dist.method, label_names = c("Row", "Column", "SNPs"))
 ```
 </center>
   
@@ -188,13 +213,12 @@ if(exists('treepath')){
     paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])
   }
   
+  # set the root method
   if(config$root.method == 'midpoint'){
     tree <- midpoint.root(tree)
-  }
-  else if(config$root.method == 'unrooted'){
+  } else if(config$root.method == 'unrooted'){
     tree <- tree
-  }
-  else {
+  } else {
     node <- match(config$root.method, tree$tip.label)
     if(is.na(node)){
       message('Root sample ID not found')
@@ -207,40 +231,57 @@ if(exists('treepath')){
   # metadata
   id <- tree$tip.label
   
-  # group samples if we have a grouping catagory
-  if(any(!is.na(sampleDF$TreeGroup))){
-    #reorder sampleDF
-    orderedDF <- sampleDF[match(id,sampleDF$'Lab ID'),]
-    grp <- orderedDF$TreeGroup
+  # create colrs label - doing here since order might be different than the sampleDF
+  col_colors_label=id
+  for (sid in col_colors_label){
+    col_colors_label=gsub(sid,subset(sampleDF,specimen_id==sid)$colID[1],col_colors_label)
   }
-  else {
-    grp <- NULL
-  }
+  col_colors_label
   
+  # create tibble of ID's
   dat <- tibble::tibble(id = id)
-  # plot tree
-  ggtree_plot <- ggtree(tree)
-  metat <- ggtree_plot$data %>%
-    dplyr::inner_join(dat, c('label' = 'id'))
   
-  ggtree_plot <- ggtree_plot +
-    geom_point(data = metat,
-               aes(x = x,
-                   y = y,
-                   colour = grp,
-                   label = id, text = paste0(id)),show.legend = FALSE)
+  # generate tree
+  ggtree_basic=ggtree(tree,branch.length="none") +  
+    geom_nodepoint() + 
+    geom_tiplab(size=3) + 
+    geom_tree() + 
+    theme_tree() + 
+    geom_tippoint(color=col_colors_label)
   
+  # pull data to create node labels
+  d <- ggtree_basic$data
+  bs <- d[!d$isTip,]
+  bs$label <- as.numeric(bs$label)
+  #bs <- bs[bs$label > config$bootstrap.threshold,]
+  ggtree_plot <- ggtree_basic + geom_text(data=bs,aes(label=label,hjust=-.3)) + ggplot2::xlim(0, 13)
+  ggtree_plot
   
-  if(config$show.bootstrap){
-    #filter bootstrap values
-    d <- ggtree_plot$data
-    bs <- d[!d$isTip,]
-    bs$label <- as.numeric(bs$label)
-    bs <- bs[bs$label > config$bootstrap.threshold,]
-    ggtree_plot <- ggtree_plot + geom_text(data=bs,aes(label=label,),position = position_dodge2(width = 0.001))
-  }
+  # create df for bar labels
+  sampleDF$bar=1
+  d1 <- sampleDF[,c("specimen_id","bar","colID","species")]
+  d1$specimen_id=as.character(d1$specimen_id)
+  sorted_labels=as.data.frame(d)[1:nrow(sampleDF),]
+  sorted_labels=sorted_labels[rev(order(sorted_labels$y)),]$label
+  d1=d1[match(sorted_labels, d1$specimen_id),]
+  d1$specimen_id=factor(d1$specimen_id,levels=rev(d1$specimen_id))
   
-  ggplotly(ggtree_plot, tooltip = "text")
+  p2=ggplot(d1, aes(x =specimen_id, y = bar, fill = specimen_id)) +  
+    geom_bar(stat = "identity") +
+    geom_text( aes(label = species),
+               colour = "white", size = 2.5,hjust = 1.5)+
+    coord_flip() +
+    theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())+
+    theme(legend.position="none")+
+    scale_fill_manual(values=c(rev(d1$colID)))
+  
+
+  #library(ggpubr)
+  ggarrange(ggtree_plot,p2, widths = c(1, .4))
 }
 ```
 </center>
