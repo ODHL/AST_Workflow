@@ -164,15 +164,16 @@ elif [[ "$pipeline" == "init" ]]; then
 	dir_list=(config manifests pipeline)
         for pd in "${dir_list[@]}"; do if [[ ! -d $log_dir/$pd ]]; then mkdir -p $log_dir/$pd; fi; done
 
+        dir_list=(complete)
+        for pd in "${dir_list[@]}"; do if [[ ! -d $log_dir/manifests/$pd ]]; then mkdir -p $log_dir/manifests/$pd; fi; done
+
         ## analysis
         dir_list=(intermed qc reports)
         for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi; done
 	
-        #### tree
-        dir_list=(tree)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/intermed/tree/$pd ]]; then mkdir -p $analysis_dir/intermed/tree/$pd; fi; done
+        dir_list=(tree val)
+        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/intermed/$pd ]]; then mkdir -p $analysis_dir/intermed/$pd; fi; done
 
-        #### qc
         dir_list=(data)
         for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/qc/$pd ]]; then mkdir -p $analysis_dir/qc/$pd; fi; done
 

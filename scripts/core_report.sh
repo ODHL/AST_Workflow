@@ -58,7 +58,8 @@ if [[ $flag_results == "Y" ]]; then
     # set file
     chunk1="specimen_id,wgs_id,srr_id,wgs_date_put_on_sequencer,sequence_classification,run_id"
     chunk2="auto_qc_outcome,estimated_coverage,genome_length,assembly_ratio_(stdev),species,mlst_scheme_1"
-    chunk3="mlst_1,mlst_scheme_2,mlst_2,gamma_beta_lactam_resistance_genes,hypervirulence"
+    chunk3="mlst_1,mlst_scheme_2,mlst_2,gamma_beta_lactam_resistance_genes"
+    # chunk3="mlst_1,mlst_scheme_2,mlst_2,gamma_beta_lactam_resistance_genes,hypervirulence"
     chunk4="auto_qc_failure_reason"
     echo -e "${chunk1},${chunk2},${chunk3},${chunk4}" > $final_results 
 
@@ -84,12 +85,13 @@ if [[ $flag_results == "Y" ]]; then
         MLST_2=`cat $pipeline_results | awk -F"\t" -v i=$SID 'FNR == i {print $18}'`
         sequence_classification=`echo "MLST<$MLST_1><$MLST_Scheme_1><$Species>"`
         GAMMA_Beta_Lactam_Resistance_Genes=`cat $pipeline_results | awk -F"\t" -v i=$SID 'FNR == i {print $19}'`
-        Hypervirulence_Genes=`cat $pipeline_results | awk -F"\t" -v i=$SID 'FNR == i {print $22}'`
+        # Hypervirulence_Genes=`cat $pipeline_results | awk -F"\t" -v i=$SID 'FNR == i {print $22}'`
         Auto_QC_Failure_Reason=`cat $pipeline_results | awk -F"\t" -v i=$SID 'FNR == i {print $24}'`
         
         chunk1="$specimen_id,$wgs_id,$srr_number,$wgs_date_put_on_sequencer,\"${sequence_classification}\",$run_id"
         chunk2="$Auto_QC_Outcome,$Estimated_Coverage,$Genome_Length,$Assembly_Ratio,"${Species}",$MLST_Scheme_1"
-        chunk3="\"${MLST_1}\",$MLST_Scheme_2,\"${MLST_2}\",\"${GAMMA_Beta_Lactam_Resistance_Genes}\",\"${Hypervirulence_Genes}\""
+        # chunk3="\"${MLST_1}\",$MLST_Scheme_2,\"${MLST_2}\",\"${GAMMA_Beta_Lactam_Resistance_Genes}\",\"${Hypervirulence_Genes}\""
+        chunk3="\"${MLST_1}\",$MLST_Scheme_2,\"${MLST_2}\",\"${GAMMA_Beta_Lactam_Resistance_Genes}\""
         chunk4="\"${Auto_QC_Failure_Reason}\""
         echo -e "${chunk1},${chunk2},${chunk3},${chunk4}" >> $final_results
     done
@@ -164,4 +166,7 @@ if [[ $flag_basic == "Y" ]]; then
 
     tar -zcvf $fastqc_dir.tar.gz $fastqc_dir/
     rm -rf $fastqc_dir
+
+    # cp final file to reports
+    cp $qcreport_dir/multiqc_report.html $report_dir
 fi

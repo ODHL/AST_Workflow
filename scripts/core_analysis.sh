@@ -31,7 +31,7 @@ elif [[ $subworkflow == "ALL" ]]; then
 	flag_download="Y"
 	flag_batch="Y"
 	flag_analysis="Y"
-	flag_cleanup="N"
+	flag_cleanup="Y"
 elif [[ $subworkflow == "lala" ]]; then
 	# create manifests
 	ls
@@ -75,6 +75,7 @@ fasta_dir=$analysis_dir/fasta
 qc_dir=$analysis_dir/qc/data
 ncbi_dir=$output_dir/ncbi/data
 tree_dir=$intermed_dir/tree
+val_dir=$intermed_dir/val
 
 ## tmp dir
 tmp_dir=$output_dir/tmp
@@ -263,8 +264,8 @@ if [[ $flag_analysis == "Y" ]]; then
 	message_cmd_log "--Processing batches:"
 
 	# determine number of batches
-	batch_count=`ls $log_dir/manifests/batch* | wc -l`
-	batch_min=1
+	batch_count=`ls $log_dir/manifests/batch* | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
+	batch_min=`ls $log_dir/manifests/batch* | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
 
 	#for each batch
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
@@ -295,7 +296,7 @@ if [[ $flag_analysis == "Y" ]]; then
 			cd $workingdir
 			message_cmd_log "----Resuming pipeline at $workingdir"
 			echo "$pipeline_full_cmd"
-			$pipeline_full_cmd
+			# $pipeline_full_cmd
 		else
 			# print number of lines in file without file name "<"
 			n_samples=`wc -l < $batch_manifest`
@@ -341,25 +342,30 @@ if [[ $flag_analysis == "Y" ]]; then
 		# Reporting
 		#############################################################################################	
 		# check the pipeline has completed
-		if [[ -f $pipeline_batch_dir/*Phoenix* ]]; then 
-				# add to  master pipeline results
-				cat $pipeline_batch_dir/*Phoenix* >> $merged_pipeline
-				cp $pipeline_batch_dir/pipeline_info/* $log_dir/pipeline
-				cp $pipeline_batch_dir/*/qc_stats/* $qc_dir
-				cp $pipeline_batch_dir/*/annotation/*gff $tree_dir
-				cp $pipeline_batch_dir/*/fastp/*gz $tree_dir
+		if [[ -f $pipeline_batch_dir/Phoenix_Summary.tsv ]]; then
+			message_cmd_log "---- The pipeline completed batch #$batch_id at `date` "
+			message_cmd_log "--------------------------------------------------------"
 
-				# create files for report
-				for sample_id in ${sample_list[@]}; do
-					# grab only the sampleID - inconsistent naming is a problem
-					shortID=`echo $sample_id | cut -f1 -d"-"`
-						
-					cat $pipeline_batch_dir/${shortID}/AMRFinder/${shortID}_all_genes.tsv >> $merged_amr
-				done
+			# add to  master pipeline results
+			cat $pipeline_batch_dir/Phoenix_Summary.tsv >> $merged_pipeline
+			cp $pipeline_batch_dir/pipeline_info/* $log_dir/pipeline
+			cp $pipeline_batch_dir/*/qc_stats/* $qc_dir
+			cp $pipeline_batch_dir/*/annotation/*gff $tree_dir
+			cp $pipeline_batch_dir/*/fastp_trimd/*gz $tree_dir
+			cp $pipeline_batch_dir/*/gamma_ar/*.gamma $val_dir
+			cp $pipeline_batch_dir/*/kraken*/*wtasmbld.summary* $val_dir
 
-				# log
-				echo "-------Ending time: `date`" >> $pipeline_log
-				echo "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
+			# create files for report
+			for sample_id in ${sample_list[@]}; do
+				# grab only the sampleID - inconsistent naming is a problem
+				shortID=`echo $sample_id | cut -f1 -d"-"`
+					
+				cat $pipeline_batch_dir/${shortID}/AMRFinder/${shortID}_all_genes.tsv >> $merged_amr
+			done
+
+			# log
+			echo "-------Ending time: `date`" >> $pipeline_log
+			echo "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 
 			#############################################################################################
 			# FASTQ
@@ -370,12 +376,15 @@ if [[ $flag_analysis == "Y" ]]; then
 			# CLEANUP
 			#############################################################################################	
 			#remove intermediate files
-			if [[ $flag_cleanup == "Y" ]]; then
+			if [[ $flag_cleanup == "Y" ]] && [[ -f $merged_pipeline ]]; then
 				sudo rm -r --force $pipeline_batch_dir
 				sudo rm -r --force $fastq_batch_dir
+				mv $batch_manifest $log_dir/manifests/complete
 			fi
 		else
-			message_cmd_log "The pipeline failed `date`"
+			message_cmd_log "---- The pipeline failed `date`"
+			message_cmd_log "------Missing file: $pipeline_batch_dir/Phoenix_Summary.tsv"
+			message_cmd_log "--------------------------------------------------------"
 			exit
 		fi
 	done

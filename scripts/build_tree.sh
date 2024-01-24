@@ -44,9 +44,7 @@ tree_dir=$output_dir/analysis/intermed/tree
 
 pipeline_dir=$output_dir/pipeline
 workingdir=$pipeline_dir/working
-prokka_merged_dir=$pipeline_dir/prokka
 if [[ ! -d $workingdir ]]; then mkdir $workingdir; fi
-if [[ ! -d $prokka_merged_dir ]]; then mkdir $prokka_merged_dir; fi
 
 # set variables
 ODH_version=$config_ODH_version
@@ -54,8 +52,9 @@ phoenix_version=$config_phoenix_version
 dryad_version=$config_dryad_version
 
 # set files
-merged_tree=$intermed_dir/tree/core_genome.tree
-merged_roary=$intermed_dir/tree/core_genome_statistics.txt
+merged_tree=$intermed_dir/core_genome.tree
+merged_roary=$intermed_dir/core_genome_statistics.txt
+merged_snp=$intermed_dir/snp_distance_matrix.tsv
 samplesheet=$log_dir/manifests/samplesheet_gff.csv	
 	
 # set cmd and log
@@ -91,7 +90,7 @@ handle_fq(){
 		if [[ -f $in_treedir/$in_fqID ]]; then 
 			mv $in_treedir/$in_fqID $in_fq/$in_fqID
 		else 
-			echo "missing $in_fqID"
+			echo "missing $in_treedir/$in_fqID"
 			exit
 		fi
 	fi	
@@ -130,9 +129,8 @@ if [[ $flag_prep == "Y" ]]; then
 		# add to the samplesheet
         echo "${sample_id},$gff,$fq1,$fq2" >> $samplesheet
 	done
-	cat $samplesheet
-
-	ls $tree_dir/input_dir/*
+	# cat $samplesheet
+	# ls $tree_dir/input_dir/*
 fi
 
 if [[ $flag_analysis == "Y" ]]; then
@@ -141,7 +139,7 @@ if [[ $flag_analysis == "Y" ]]; then
 
     # Run pipeline
     cd $workingdir
-	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --outdir $pipeline_dir --treedir $tree_dir/input_dir --projectID $unique_id"
+	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --outdir $workingdir --treedir $tree_dir/input_dir --projectID $unique_id"
 	echo "$pipeline_full_cmd"
 	$pipeline_full_cmd
 
@@ -159,6 +157,14 @@ if [[ $flag_analysis == "Y" ]]; then
 fi
 
 if [[ $flag_report == "Y" ]]; then
-	cp $pipeline_batch_dir/ROARY/core_genome_statistics.txt >> $merged_roary
-	cat $pipeline_batch_dir/TREE/core_genome.tree >> $merged_tree
+	cp $workingdir/ROARY/core_genome_statistics.txt $merged_roary
+	cp $workingdir/TREE/core_genome.tree $merged_tree
+	cp $workingdir/CFSAN/snp_distance_matrix.tsv $merged_snp
+
+	if [[ -f $merged_roary ]] && [[ -f $merged_tree ]] && [[ -f $merged_snp ]]; then
+		if [[ $flag_cleanup == "Y" ]]; then
+			rm -rf $tree_dir
+		fi
+		message_cmd_log "--Pipeline Completed `date`"
+	fi
 fi

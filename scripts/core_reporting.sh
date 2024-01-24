@@ -39,16 +39,16 @@ today=`date +%Y%m%d`
 project_file="$final_dir/project_list.tsv"
 
 # set script dir
-script_dir="/home/ubuntu/workflows/AST_Workflow/bin"
-assets_dir="/home/ubuntu/workflows/AST_Workflow/assets"
+# script_dir="/home/ubuntu/workflows/AST_Workflow/bin"
+# assets_dir="/home/ubuntu/workflows/AST_Workflow/assets"
 
 # set processing dir; output
-ar_generator_dir="/home/ubuntu/tools/ar_report_generator"
+# ar_generator_dir="/home/ubuntu/tools/ar_report_generator"
 process_dir_files="/home/ubuntu/tools/ar_report_generator/processing_files"
-if [[ -d $process_dir_files ]]; then sudo rm -r $process_dir_files; fi
-process_dir_out="/home/ubuntu/tools/ar_report_generator/processing_output"
-if [[ -d $process_dir_out ]]; then sudo rm -r $process_dir_out; fi
-mkdir $process_dir_files; mkdir $process_dir_out
+# if [[ -d $process_dir_files ]]; then sudo rm -r $process_dir_files; fi
+# process_dir_out="/home/ubuntu/tools/ar_report_generator/processing_output"
+# if [[ -d $process_dir_out ]]; then sudo rm -r $process_dir_out; fi
+# mkdir $process_dir_files; mkdir $process_dir_out
 
 # set wgs
 wgs_dir="$assets_dir/wgs_db"
@@ -90,8 +90,8 @@ for proj_dir in ${project_list[@]}; do
 
     file_list=($amr_reports $phoenix_report $snpmatrix $tree)
     for f in ${file_list[@]}; do
-        if [[ ! -f $snpmatrix ]]; then
-            echo "Missing FILE required for basic report: $snpmatrix"
+        if [[ ! -f $f ]]; then
+            echo "Missing FILE required for basic report: $f"
             exit
         fi
     done
@@ -130,9 +130,9 @@ for proj_dir in ${project_list[@]}; do
     cat $output_dir/DRYAD/core_genome_statistics.txt >> $report_dir/tmp_core_genome_statistics.txt
 done
 
-sort $report_dir/tmp_snp_distance_matrix.tsv | uniq > $report_dir/snp_distance_matrix.tsv
-sort $report_dir/tmp_core_genome.tree | uniq > $report_dir/core_genome.tree
-sort $report_dir/tmp_core_genome_statistics.txt | uniq > $report_dir/core_genome_statistics.txt
+cp $intermed_dir/snp_distance_matrix.tsv $report_dir
+cp $intermed_dir/tmp_core_genome.tree | uniq > $report_dir/core_genome.tree
+cp $intermed_dir/tmp_core_genome_statistics.txt | uniq > $report_dir/core_genome_statistics.txt
 
 # run basic report
 ## includes: QC, SUMMARY | HEATMAP, TREE

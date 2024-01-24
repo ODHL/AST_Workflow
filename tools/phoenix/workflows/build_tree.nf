@@ -107,7 +107,7 @@ workflow BUILD_TREE {
     emit:
         distmatrix  = CFSAN.out.distmatrix
         core_stats  = ROARY.out.core_stats
-        tree        = TREE.out.tree
+        tree        = TREE.out.genome_tree
 }
 
 /*
