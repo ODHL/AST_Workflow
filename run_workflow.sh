@@ -114,13 +114,10 @@ intermed_dir=$analysis_dir/intermed
 intermed_sample_dir=$intermed_dir/sample_level_data/assembly
 
 #############################################################################################
-# Run Phases
+# Run workflows
 #############################################################################################
-#bash run_workflow.sh -n OH-VH00648-231120_ASTVAL -p phase1
+# bash run_workflow.sh -n OH-VH00648-231120_ASTVAL -p phase1
 if [[ $pipeline == "phase1" ]]; then
-        # remove prev runs
-        sudo rm -rf ~/output/$project_name
-	
         # init
         bash run_workflow.sh -p init -n $project_id
 
@@ -144,6 +141,15 @@ elif [[ $pipeline == "phase2" ]]; then
         # create basic report
         bash run_workflow.sh -p report -n $project_id
 
+elif [[ "$pipeline" == "validation" ]]; then
+        # init
+        bash run_workflow.sh -p init -n $project_id
+
+	# run through analysis workflow
+        bash run_workflow.sh -p analysis -n $project_id -s ALL
+
+        # generate report
+        bash validation/ast_validation.sh $subworkflow $project_name_full $output_dir $pipeline_log
 #############################################################################################
 # Run init
 #############################################################################################
@@ -198,7 +204,6 @@ elif [[ "$pipeline" == "init" ]]; then
         echo "------------------------------------------------------------------------"
 	echo -e "Configs are ready to be edited:\n${log_dir}/conf"
 #############################################################################################
-#############################################################################################
 # Run analysis
 #############################################################################################
 elif [[ "$pipeline" == "analysis" ]]; then
@@ -223,6 +228,17 @@ elif [[ "$pipeline" == "analysis" ]]; then
                 "${subworkflow}" \
                 "${resume}" \
                 "${testing}"
+#############################################################################################
+# Run TREE
+#############################################################################################
+elif [[ "$pipeline" == "tree" ]]; then
+        bash scripts/build_tree.sh \
+                "${output_dir}" \
+                "${project_name_full}" \
+                "${pipeline_config}" \
+                "${pipeline_log}" \
+                "${resume}" \
+                "${subworkflow}"
 #############################################################################################
 # Run ID
 #############################################################################################
@@ -272,25 +288,4 @@ elif [[ "$pipeline" == "cleanup" ]]; then
                 "${output_dir}" \
                 "${project_name_full}" \
                 "${pipeline_config}"
-#############################################################################################
-# Run validation
-#############################################################################################
-elif [[ "$pipeline" == "validation" ]]; then
-        bash validation/ast_validation.sh \
-                $subworkflow \
-                $project_name_full \
-                $resume $output_dir \
-                "${pipeline_config}" \
-                $pipeline_log
-#############################################################################################
-# Run TREE
-#############################################################################################
-elif [[ "$pipeline" == "tree" ]]; then
-        bash scripts/build_tree.sh \
-                "${output_dir}" \
-                "${project_name_full}" \
-                "${pipeline_config}" \
-                "${pipeline_log}" \
-                "${resume}" \
-                "${subworkflow}"
 fi

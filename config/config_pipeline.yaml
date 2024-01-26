@@ -1,5 +1,5 @@
 # params
-batch_limit: 7
+batch_limit: 8
 
 # tools
 basespace_cmd: "/home/ubuntu/tools/basespace"

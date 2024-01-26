@@ -18,6 +18,7 @@ flag_download="N"
 flag_batch="N"
 flag_analysis="N"
 flag_cleanup="N"
+flag_post="N"
 
 if [[ $subworkflow == "DOWNLOAD" ]]; then
 	flag_download="Y"
@@ -31,10 +32,11 @@ elif [[ $subworkflow == "ALL" ]]; then
 	flag_download="Y"
 	flag_batch="Y"
 	flag_analysis="Y"
+	flag_post="Y"
 	flag_cleanup="Y"
 elif [[ $subworkflow == "lala" ]]; then
 	# create manifests
-	ls
+	flag_post="Y"
 	# for f in *ds*/*; do
 	# 	new=`echo $f  | sed "s/_[0-9].*//g"`
 	# 	echo "$new"
@@ -76,13 +78,13 @@ qc_dir=$analysis_dir/qc/data
 ncbi_dir=$output_dir/ncbi/data
 tree_dir=$intermed_dir/tree
 val_dir=$intermed_dir/val
+amr_dir=$intermed_dir/amr
 
 ## tmp dir
 tmp_dir=$output_dir/tmp
 
 # set files
 merged_pipeline=$intermed_dir/pipeline_results.tsv
-merged_amr=$intermed_dir/ar_all_genes.tsv
 sample_id_file=$log_dir/manifests/sample_ids.txt
 
 # set variables
@@ -202,14 +204,14 @@ if [[ $flag_batch == "Y" ]]; then
 			echo "sample,fastq_1,fastq_2" > $log_dir/manifests/samplesheet_${batch_name}.csv
 
 			# create batch dirs
-			fastq_batch_dir=$pipeline_dir/batch_$batch_count
+			pipeline_batch_dir=$pipeline_dir/batch_$batch_count
         fi
         	
         #echo sample id to the batch
  		echo ${sample_id} >> $batch_manifest
                	
 		# prepare samplesheet
-        echo "${sample_id},$fastq_batch_dir/$sample_id.R1.fastq.gz,$fastq_batch_dir/$sample_id.R2.fastq.gz">>$samplesheet
+        echo "${sample_id},$pipeline_batch_dir/$sample_id.R1.fastq.gz,$pipeline_batch_dir/$sample_id.R2.fastq.gz">>$samplesheet
 
     	#increase sample counter
     	((sample_count+=1))
@@ -258,14 +260,13 @@ fi
 #############################################################################################
 # Analysis
 #############################################################################################
-# first pass
 if [[ $flag_analysis == "Y" ]]; then
 	#log
 	message_cmd_log "--Processing batches:"
 
 	# determine number of batches
-	batch_count=`ls $log_dir/manifests/batch* | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
-	batch_min=`ls $log_dir/manifests/batch* | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
+	batch_count=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
+	batch_min=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
 
 	#for each batch
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
@@ -275,10 +276,8 @@ if [[ $flag_analysis == "Y" ]]; then
 		
 		#set batch manifest, dirs
 		batch_manifest=$log_dir/manifests/batch_${batch_name}.txt
-		fastq_batch_dir=$pipeline_dir/batch_$batch_id
 		pipeline_batch_dir=$pipeline_dir/batch_$batch_id
 		samplesheet=$log_dir/manifests/samplesheet_0$batch_id.csv
-		if [[ ! -d $fastq_batch_dir ]]; then mkdir $fastq_batch_dir; fi
 		if [[ ! -d $pipeline_batch_dir ]]; then mkdir $pipeline_batch_dir; fi
 
 		# read text file
@@ -296,7 +295,7 @@ if [[ $flag_analysis == "Y" ]]; then
 			cd $workingdir
 			message_cmd_log "----Resuming pipeline at $workingdir"
 			echo "$pipeline_full_cmd"
-			# $pipeline_full_cmd
+			$pipeline_full_cmd
 		else
 			# print number of lines in file without file name "<"
 			n_samples=`wc -l < $batch_manifest`
@@ -309,7 +308,7 @@ if [[ $flag_analysis == "Y" ]]; then
 				shortID=`echo $sample_id | cut -f1 -d"-"`
 				
 				# move files to batch fasta dir
-				mv $tmp_dir/*${shortID}*/*fastq.gz $fastq_batch_dir
+				mv $tmp_dir/*${shortID}*/*fastq.gz $pipeline_batch_dir
 					
 				# remove downloaded tmp dir
 				rm -r --force $tmp_dir/${sample_id}_[0-9]*/
@@ -322,7 +321,7 @@ if [[ $flag_analysis == "Y" ]]; then
 			cleanmanifests $log_dir/manifests/sample_ids.txt
 			
 			## fastq files renamed
-			for f in $fastq_batch_dir/*; do
+			for f in $pipeline_batch_dir/*gz; do
 				new=`echo $f | sed "s/_S[0-9].*_L001//g" | sed "s/_001//g" | sed "s/[_-]ASTVAL//g" |  sed "s/[_-]AST//g" | sed "s/-$project_name_full//g" | sed "s/-$project_name//g" | sed "s/-OH//g" | sed "s/_R/.R/g"`
 				if [[ $new != $f ]]; then mv $f $new; fi
 			done
@@ -353,15 +352,7 @@ if [[ $flag_analysis == "Y" ]]; then
 			cp $pipeline_batch_dir/*/annotation/*gff $tree_dir
 			cp $pipeline_batch_dir/*/fastp_trimd/*gz $tree_dir
 			cp $pipeline_batch_dir/*/gamma_ar/*.gamma $val_dir
-			cp $pipeline_batch_dir/*/kraken*/*wtasmbld.summary* $val_dir
-
-			# create files for report
-			for sample_id in ${sample_list[@]}; do
-				# grab only the sampleID - inconsistent naming is a problem
-				shortID=`echo $sample_id | cut -f1 -d"-"`
-					
-				cat $pipeline_batch_dir/${shortID}/AMRFinder/${shortID}_all_genes.tsv >> $merged_amr
-			done
+			cp $pipeline_batch_dir/*/amr/*_all_genes.tsv $val_dir
 
 			# log
 			echo "-------Ending time: `date`" >> $pipeline_log
@@ -378,7 +369,6 @@ if [[ $flag_analysis == "Y" ]]; then
 			#remove intermediate files
 			if [[ $flag_cleanup == "Y" ]] && [[ -f $merged_pipeline ]]; then
 				sudo rm -r --force $pipeline_batch_dir
-				sudo rm -r --force $fastq_batch_dir
 				mv $batch_manifest $log_dir/manifests/complete
 			fi
 		else
@@ -388,4 +378,46 @@ if [[ $flag_analysis == "Y" ]]; then
 			exit
 		fi
 	done
+fi
+
+#############################################################################################
+# Output correction
+#############################################################################################
+if [[ $flag_post == "Y" ]]; then
+	#log
+	message_cmd_log "--Quality"
+
+	# read in final report; create sample list
+    if [[ -f $output_dir/analysis/intermed/tmp_sampleids.txt ]]; then rm $output_dir/analysis/intermed/tmp_sampleids.txt; fi
+    cat $merged_pipeline | awk -F"\t" '{print $1}' | grep -v "ID"> $output_dir/analysis/intermed/tmp_sampleids.txt
+    IFS=$'\n' read -d '' -r -a sample_list < $output_dir/analysis/intermed/tmp_sampleids.txt
+    
+	# save file during dev
+	cp $merged_pipeline saveme
+
+	# read in all samples
+	for id in "${sample_list[@]}"; do
+		
+		# pull the sample ID
+		specimen_id=$id
+	    SID=$(awk -v sid=$specimen_id '{ if ($1 == sid) print NR }' $merged_pipeline)
+        
+		# pull the needed variables
+		Auto_QC_Outcome=`cat $pipeline_results | awk -F"\t" -v i=$SID 'FNR == i {print $2}'`
+		Estimated_Coverage=`cat $pipeline_results | awk -F"\t" -v i=$SID 'FNR == i {print $4}'`
+        
+		# check if the failure is real
+		# check if the failure is real
+		cov_replace="coverage_below_30($Estimated_Coverage)"
+		if [[ $Estimated_Coverage -gt 29 ]]; then
+			awk -F"\t" -v i=$SID 'NR==i {$2="PASS"}1' $merged_pipeline > tmp_pipeline
+		else
+			awk -F"\t" -v i=$SID -v cov=$cov_replace 'NR==i {$24=cov}1' $merged_pipeline > tmp_pipeline
+		fi
+			
+		sed -i "s/coverage_below_30(0)//g" tmp_pipeline
+		cp tmp_pipeline $merged_pipeline
+    done
+
+	rm tmp_pipeline
 fi
