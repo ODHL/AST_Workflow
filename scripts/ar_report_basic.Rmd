@@ -1,11 +1,14 @@
 ---
-title: "PUBLIC HEALTH WHOLE GENOME SEQUENCING ANALYSIS REPORT"
-output:
-  html_document:
-    theme: paper
-    df_print: paged
-editor_options: 
-  chunk_output_type: console
+title: "Public Health Whole Genome Sequencing Analysis Report"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    navbar:
+      - { title: "ODHL", href:
+      "https://odh.ohio.gov/know-our-programs/microbiology/microbiology",
+      align_right}
+    logo: "test.png"
 params:
   configFILE: "REP_CONFIG"
   projectname: "REP_PROJID"
@@ -17,6 +20,8 @@ params:
   cgstats: "REP_CORE"
   arpredictions: "REP_AR"
   testing: "N"
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r libs, echo=FALSE,include=FALSE,warning=FALSE,message=FALSE}
@@ -35,8 +40,10 @@ library(phytools)
 library(DT)
 library(RColorBrewer)
 library(ggpubr)
+library(flexdashboard)
+library(crosstalk)
 knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message=FALSE)
-
+'%ni%' <- function(x,y)!('%in%'(x,y))
 ```
 
 ```{r args, echo=FALSE,warning=FALSE}
@@ -117,20 +124,26 @@ ar_summary$Sample=gsub("_[0-9][0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
 ar_summary$Sample=gsub("_[0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
 ar_summary$Sample=gsub("_[0-9]_length_[0-9]*","",ar_summary$Sample)
 ar_summary=ar_summary[!duplicated(ar_summary),]
+
+# create metadata
+generate_ids=function(list_in){
+  tmp_list=which( colnames(sampleDF) %ni% list_in ) -1
+  return(tmp_list)
+}
+id_nums=generate_ids(c("specimen_id","wgs_id","srr_id",
+                       "wgs_date_put_on_sequencer","run_id","auto_qc_outcome"))
+tax_nums=generate_ids(c("specimen_id","species","sequence_classification",
+                        "mlst_1","gamma_beta_lactam_resistance_genes"))
+qc_nums=generate_ids(c("specimen_id","estimated_coverage","genome_length",
+                        "auto_qc_failure_reason"))
+sample_meta=SharedData$new(sampleDF)
 ```
 
-<div class ="titlePanel">
-```{r, echo=FALSE, fig.align='left',out.height='100px',out.extra="style='margin:20px'"}
-knitr::include_graphics(config$logo)
-```
-</div>
-
-
-<div class="subtitle">
-  `r subHeaderText`
-</div>
-  
-<center>
+Information {data-orientation=columns data-icon="fa-info-circle"}
+=================================================================
+Column {data-width=600}
+-----------------------
+### Overview 
 ```{r intro}
 # create table
 colnames(headerDF) <- c("REPORT DATE","PROJECT NAME","PREPARED BY")
@@ -138,44 +151,179 @@ colnames(headerDF) <- c("REPORT DATE","PROJECT NAME","PREPARED BY")
 # plot table
 pander(headerDF)
 ```
-</center>
-  
-## SAMPLE INFO  {.tabset}
-`r summaryTEXT`
 
-### IDs {.tabset}
-<center>
+### METHODS
+`r methodsTEXT`
+Column {data-width=600}
+-----------------------
+### DISCLAIMER
+`r disclaimerTEXT`
+
+Datatables {data-orientation=columns data-icon="ion-search"}
+=================================================================
+
+Input {.sidebar}
+-----------------------------------------------------------------------
+
+### Filters 
+```{r filter}
+filter_select(
+  id="auto_qc_outcome",
+  label = "QC Status",
+  sharedData = sample_meta,
+  group = ~auto_qc_outcome
+)
+filter_select(
+  id="run_id",
+  label = "Run ID",
+  sharedData = sample_meta,
+  group = ~run_id
+)
+```
+
+Raw {data-width=700 .tabset}
+-----------------------------------------------------------------------
+### Sample
+
 ```{r ids, echo=FALSE}
-# https://github.com/CDCgov/phoenix/wiki/Pipeline-Overview#pipeline-qc-checks
-DT::datatable(sampleDF[,c(1:4,6,7)])
+sample_meta %>%
+  DT::datatable(
+    extensions = c("Buttons","Scroller"),
+    rownames=FALSE,
+    style="bootstrap",
+    width="100%",
+    class="compact",
+    options=list(
+      dom="Blrtrip",
+      deferREander=TRUE,
+      columnDefs=list(
+        list(
+          visible=FALSE,
+          targets=id_nums
+        )
+      ),
+      buttons = list(I("colvis"),"csv","excel")
+      ),
+    colnames = c(
+      "ID" = "specimen_id",
+      "WGS" = "wgs_id",
+      "SRR" = "srr_id",
+      "SeqDate" = "wgs_date_put_on_sequencer",
+      "RunID" = "run_id",
+      "QC" = "auto_qc_outcome"
+    )
+  )
 ```
 
+### Taxonomy
+```{r tax, echo=FALSE}
+sample_meta %>%
+  DT::datatable(
+    extensions = c("Buttons","Scroller"),
+    rownames=FALSE,
+    style="bootstrap",
+    width="100%",
+    class="compact",
+    options=list(
+      dom="Blrtrip",
+      deferREander=TRUE,
+      columnDefs=list(
+        list(
+          visible=FALSE,
+          targets=tax_nums
+        )
+      ),
+      buttons = list(I("colvis"),"csv","excel")
+      ),
+    colnames = c(
+      "ID" = "specimen_id",
+      "Species" = "species",
+      "SeqClass" = "sequence_classification",
+      "SeqDate" = "wgs_date_put_on_sequencer",
+      "MLST1" = "mlst_1",
+      "bLac Genes" = "gamma_beta_lactam_resistance_genes"
+    )
+  )
+```
 
-### QC {.tabset}
-<center>
+### QC
 ```{r qc, echo=FALSE}
-# https://github.com/CDCgov/phoenix/wiki/Pipeline-Overview#pipeline-qc-checks
-DT::datatable(sampleDF[,c(1:3,8:10,18)])
+sample_meta %>%
+  DT::datatable(
+    extensions = c("Buttons","Scroller"),
+    rownames=FALSE,
+    style="bootstrap",
+    width="100%",
+    class="compact",
+    options=list(
+      dom="Blrtrip",
+      deferREander=TRUE,
+      columnDefs=list(
+        list(
+          visible=FALSE,
+          targets=qc_nums
+        )
+      ),
+      buttons = list(I("colvis"),"csv","excel")
+      ),
+    colnames = c(
+      "ID" = "specimen_id",
+      "Coverage" = "estimated_coverage",
+      "GenomeLength" = "genome_length",
+      "QC Fail" = "auto_qc_failure_reason"
+    )
+  )
 ```
-</center>
 
+### ARGene Table
+```{r ar_table}
+if(exists('ar_summary')){
   
-### SUMMARY {.tabset}
+  # determine gene consensus at 50%
+  number_of_samples=round(length(unique(ar_summary$Sample))*.5+.5,0)
+  output_df=data.frame()
+  for (geneID in unique(ar_summary$Gene)){
+    tmp_df=subset(ar_summary,Gene==geneID)
+    if (nrow(tmp_df)>number_of_samples-1){
+      if (nrow(output_df)==0){
+        output_df=tmp_df
+      } else{
+        output_df=rbind(tmp_df,output_df)
+      }
+    }
+  }
+  # strip rownames, order by gene name
+  row.names(output_df) <- NULL
+  output_df <- output_df[order(output_df$Gene),]
   
-<center>
-```{r samples}
-# plot table
-DT::datatable(sampleDF[,c(1:3,5,11:17)])
+  # if there are consensus genes then print table
+  if (nrow(output_df)==0){
+    print("There are no genes with consensus between at least 50% of samples")
+  } else{
+    DT::datatable(output_df,
+          rownames = FALSE,
+          extensions = 'RowGroup',
+          options = list(rowGroup = list(dataSrc=c(1)),
+                         columnDefs = list(list(visible=FALSE, targets=c(1)))
+                         )
+          )
+  }
+}
 ```
-</center>
 
-  
-## RELATEDNESS {.tabset}
-  
-### HEATMAP {.tabset}
-`r config$heatmap.text`
-<center>
+Analysis {data-orientation=columns data-icon="ion-android-options"}
+=================================================================
+Column {data-width=800 .tabset}
+-----------------------------------------------------------------------
+### Taxonomy
+```{r counts}
+subset(sampleDF,auto_qc_outcome=="PASS")%>%
+ggplot(aes(x = species,fill=species)) +
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
 
+### Heatmap
 ```{r heatmap}
 rowlabels=as.data.frame(rownames(snpData))
 colnames(rowlabels)="specimen_id"
@@ -195,14 +343,8 @@ heatmaply(snpData,
           show_dendrogram = c(TRUE, FALSE),
           dist_method=config$heat.dist.method, label_names = c("Row", "Column", "SNPs"))
 ```
-</center>
-  
-### PHYLOGENETIC TREE {.tabset}
-`r config$tree.text`
-`r if(exists('treepath') & exists('cgstats')){paste("Core Genes Identified: ",cgstats[cgstats$V1 == 'Core genes',3],'\n')}`
-`r if(exists('treepath') & exists('cgstats')){paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])}`
 
-<center>
+### Phylogenetic Tree
 ```{r tree, message=FALSE}
 if(exists('treepath')){
   set.seed(42)
@@ -283,49 +425,35 @@ if(exists('treepath')){
   ggarrange(ggtree_plot,p2, widths = c(1, .4))
 }
 ```
-</center>
-  
-### AR GENE SUMMARY {.tabset}
-`r config$ar_gene_summary.text`
-<center>
-```{r ar_table}
+
+### ARGene Summary
+```{r ar_summary}
 if(exists('ar_summary')){
-  
-  # determine gene consensus at 50%
-  number_of_samples=round(length(unique(ar_summary$Sample))*.5+.5,0)
-  output_df=data.frame()
-  for (geneID in unique(ar_summary$Gene)){
-    tmp_df=subset(ar_summary,Gene==geneID)
-    if (nrow(tmp_df)>number_of_samples-1){
-      if (nrow(output_df)==0){
-        output_df=tmp_df
-      } else{
-        output_df=rbind(tmp_df,output_df)
-      }
-    }
-  }
-  # strip rownames, order by gene name
-  row.names(output_df) <- NULL
-  output_df <- output_df[order(output_df$Gene),]
-  
   # if there are consensus genes then print table
   if (nrow(output_df)==0){
     print("There are no genes with consensus between at least 50% of samples")
   } else{
-    DT::datatable(output_df,
-          rownames = FALSE, 
-          extensions = 'RowGroup', 
-          options = list(rowGroup = list(dataSrc=c(1)),
-                         columnDefs = list(list(visible=FALSE, targets=c(1)))
-                         )
-          )
+    merge(sampleDF,output_df, by.x="specimen_id",
+      by.y="Sample")[,c("specimen_id","Gene","species","run_id")] %>% 
+      ggplot(aes(x = Gene,fill=species)) +
+      geom_bar() + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+      facet_grid(~run_id)
   }
 }
 ```
-</center>
-  
-## METHODS
-`r methodsTEXT`
 
-## DISCLAIMER
-`r disclaimerTEXT`
+Column {data-width=200}
+-----------------------------------------------------------------------
+### Notes
+
+#### Heatmap
+`r config$heatmap.text`
+
+#### Phylogenetic Tree
+`r config$tree.text`
+`r if(exists('treepath') & exists('cgstats')){paste("Core Genes Identified: ",cgstats[cgstats$V1 == 'Core genes',3],'\n')}`
+`r if(exists('treepath') & exists('cgstats')){paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])}`
+
+#### ARGene
+`r config$ar_gene_summary.text`
