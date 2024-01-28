@@ -143,10 +143,8 @@ Information {data-orientation=columns data-icon="fa-info-circle"}
 =================================================================
 Column {data-width=600}
 -----------------------
-### Overview 
+### `r subHeaderText` 
 ```{r intro}
-pander(subHeaderText)
-
 # create table
 colnames(headerDF) <- c("REPORT DATE","PROJECT NAME","PREPARED BY")
 
