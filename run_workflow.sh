@@ -28,13 +28,15 @@ helpFunction()
    echo -e "\t-r Y,N option to resume a partial run settings (default N)"
    echo "Usage: $5 -t [OPTIONAL] testing_flag"
    echo -e "\t-t Y,N option to run test settings (default N)"
-   echo "Usage: $6 -o [OPTIONAL] report_flag"
+   echo "Usage: $6 -m [OPTIONAL] merged_projects"
+   echo -e "\t-m list of comma sep projects"
+   echo "Usage: $7 -o [OPTIONAL] report_flag"
    echo -e "\t-o type of report [BASIC OUTBREAK NOVEL REGIONAL TIME]"
 
    exit 1 # Exit script after printing help
 }
 
-while getopts "p:n:s:r:t:o:" opt
+while getopts "p:n:s:r:t:m:o:" opt
 do
    case "$opt" in
         p ) pipeline="$OPTARG" ;;
@@ -43,6 +45,7 @@ do
        	r ) resume="$OPTARG" ;;
        	t ) testing="$OPTARG" ;;
         o ) report_flag="$OPTARG" ;;
+        m ) merged_projects="$OPTARG" ;;
         ? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
    esac
 done
@@ -139,9 +142,9 @@ elif [[ $pipeline == "phase2" ]]; then
         bash run_workflow.sh -p ncbi_download -n $project_id
 
         # create basic report
-        bash run_workflow.sh -p report -n $project_id
+        bash run_workflow.sh -p report -n $project_id -s BASIC
 
-elif [[ "$pipeline" == "validation" ]]; then
+elif [[ "$pipeline" == "phaseV" ]]; then
         # init
         bash run_workflow.sh -p init -n $project_id
 
@@ -150,6 +153,19 @@ elif [[ "$pipeline" == "validation" ]]; then
 
         # generate report
         bash validation/ast_validation.sh $subworkflow $project_name_full $output_dir $pipeline_log
+elif [[ "$pipeline" == "phaseM" ]]; then
+        # init
+        bash run_workflow.sh -p init -n $project_id
+
+        # run merge
+        bash run_workflow.sh -p merge -n $project_id -m $merged_projects
+
+        # run tree
+        bash run_workflow.sh -p tree -n $project_id -s ALL
+
+        # create outbreak report
+        bash run_workflow.sh -p report -n $project_id -s OUTBREAK
+
 #############################################################################################
 # Run init
 #############################################################################################
@@ -288,4 +304,22 @@ elif [[ "$pipeline" == "cleanup" ]]; then
                 "${output_dir}" \
                 "${project_name_full}" \
                 "${pipeline_config}"
+#############################################################################################
+# Run merge
+#############################################################################################
+elif [[ "$pipeline" == "merge" ]]; then
+        message_cmd_log "------------------------------------------------------------------------"
+        message_cmd_log "--- STARTING MERGING ---"
+        bash scripts/merge_projects.sh \
+                "${merged_projects}" \
+                "${project_id}"
+#############################################################################################
+# Run validation
+#############################################################################################
+elif [[ "$pipeline" == "validation" ]]; then
+        message_cmd_log "------------------------------------------------------------------------"
+        message_cmd_log "--- STARTING VALIDATION ---"
+        
+        # generate report
+        bash scripts/ast_validation.sh $subworkflow $project_name_full $output_dir $pipeline_log
 fi

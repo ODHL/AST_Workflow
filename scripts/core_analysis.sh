@@ -28,6 +28,8 @@ elif [[ $subworkflow == "ANALYZE" ]]; then
 	flag_analysis="Y"
 elif [[ $subworkflow == "CLEAN" ]]; then
 	flag_cleanup="Y"
+elif [[ $subworkflow == "POST" ]]; then
+	flag_post="Y"
 elif [[ $subworkflow == "ALL" ]]; then
 	flag_download="Y"
 	flag_batch="Y"
@@ -84,7 +86,8 @@ amr_dir=$intermed_dir/amr
 tmp_dir=$output_dir/tmp
 
 # set files
-merged_pipeline=$intermed_dir/pipeline_results.tsv
+pipeline_results=$intermed_dir/pipeline_results.tsv
+pipeline_results_clean=$intermed_dir/pipeline_results_clean.tsv
 sample_id_file=$log_dir/manifests/sample_ids.txt
 
 # set variables
@@ -346,7 +349,7 @@ if [[ $flag_analysis == "Y" ]]; then
 			message_cmd_log "--------------------------------------------------------"
 
 			# add to  master pipeline results
-			cat $pipeline_batch_dir/Phoenix_Summary.tsv >> $merged_pipeline
+			cat $pipeline_batch_dir/Phoenix_Summary.tsv >> $pipeline_results
 			cp $pipeline_batch_dir/pipeline_info/* $log_dir/pipeline
 			cp $pipeline_batch_dir/*/qc_stats/* $qc_dir
 			cp $pipeline_batch_dir/*/annotation/*gff $tree_dir
@@ -367,7 +370,7 @@ if [[ $flag_analysis == "Y" ]]; then
 			# CLEANUP
 			#############################################################################################	
 			#remove intermediate files
-			if [[ $flag_cleanup == "Y" ]] && [[ -f $merged_pipeline ]]; then
+			if [[ $flag_cleanup == "Y" ]] && [[ -f $pipeline_results ]]; then
 				sudo rm -r --force $pipeline_batch_dir
 				mv $batch_manifest $log_dir/manifests/complete
 			fi
@@ -385,39 +388,47 @@ fi
 #############################################################################################
 if [[ $flag_post == "Y" ]]; then
 	#log
-	message_cmd_log "--Quality"
+	message_cmd_log "--Quality Analysis"
 
 	# read in final report; create sample list
-    if [[ -f $output_dir/analysis/intermed/tmp_sampleids.txt ]]; then rm $output_dir/analysis/intermed/tmp_sampleids.txt; fi
-    cat $merged_pipeline | awk -F"\t" '{print $1}' | grep -v "ID"> $output_dir/analysis/intermed/tmp_sampleids.txt
-    IFS=$'\n' read -d '' -r -a sample_list < $output_dir/analysis/intermed/tmp_sampleids.txt
+	sample_ids=$output_dir/logs/manifests/sample_ids.txt
+	tmp_pipe=$output_dir/analysis/intermed/tmp_pipe.txt
+    IFS=$'\n' read -d '' -r -a sample_list < $sample_ids
     
 	# save file during dev
-	cp $merged_pipeline saveme
-
+	random="sed -i "s/pipeline_/${RANDOM}_pipeline/g" ${pipeline_results}"
+	cp $pipeline_results $random
+	cp $pipeline_results $pipeline_results_clean
+	sed -i "s/\t/;/g" $pipeline_results_clean
+	
 	# read in all samples
 	for id in "${sample_list[@]}"; do
 		
 		# pull the sample ID
 		specimen_id=$id
-	    SID=$(awk -v sid=$specimen_id '{ if ($1 == sid) print NR }' $merged_pipeline)
-        
+		SID=$(awk -F";" -v sid=$specimen_id '{ if ($1 == sid) print NR }' $pipeline_results_clean)
+        # echo $SID
+
 		# pull the needed variables
-		Auto_QC_Outcome=`cat $pipeline_results | awk -F"\t" -v i=$SID 'FNR == i {print $2}'`
-		Estimated_Coverage=`cat $pipeline_results | awk -F"\t" -v i=$SID 'FNR == i {print $4}'`
-        
-		# check if the failure is real
+		Auto_QC_Outcome=`cat $pipeline_results_clean | awk -F";" -v i=$SID 'FNR == i {print $2}'`
+		Estimated_Coverage=`cat $pipeline_results_clean | awk -F";" -v i=$SID 'FNR == i {print $4}' | cut -f1 -d"."`
+
 		# check if the failure is real
 		cov_replace="coverage_below_30($Estimated_Coverage)"
 		if [[ $Estimated_Coverage -gt 29 ]]; then
-			awk -F"\t" -v i=$SID 'NR==i {$2="PASS"}1' $merged_pipeline > tmp_pipeline
+			awk -F";" -v i=$SID 'BEGIN {OFS = FS} NR==i {$2="PASS"}1' $pipeline_results_clean > $tmp_pipe
 		else
-			awk -F"\t" -v i=$SID -v cov=$cov_replace 'NR==i {$24=cov}1' $merged_pipeline > tmp_pipeline
+			awk -F";" -v i=$SID -v cov=$cov_replace 'BEGIN {OFS = FS} NR==i {$24=cov}1' $pipeline_results_clean > $tmp_pipe
 		fi
-			
-		sed -i "s/coverage_below_30(0)//g" tmp_pipeline
-		cp tmp_pipeline $merged_pipeline
+		
+		# clean up coverage
+		sed -i "s/coverage_below_30(0)//g" $tmp_pipe
+		
+		# save new output
+		cp $tmp_pipe $pipeline_results_clean
     done
 
-	rm tmp_pipeline
+	# cleanup
+	mv $pipeline_results_clean $pipeline_results
+	rm $tmp_pipe
 fi

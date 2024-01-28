@@ -13,11 +13,11 @@ pipeline_config=$4
 flag_report="N"
 flag_mqc="N"
 
-if [[ $flag == "REPORT" ]]; then
+if [[ $subworkflow == "REPORT" ]]; then
 	flag_report="Y"
-elif [[ $flag == "MQC" ]]; then
+elif [[ $subworkflow == "MQC" ]]; then
 	flag_mqc="Y"
-elif [[ $flag == "ALL" ]]; then
+elif [[ $subworkflow == "ALL" ]]; then
     flag_report="Y"
     flag_mqc="Y"
 fi
@@ -37,7 +37,11 @@ analysis_dir=$output_dir/analysis
 # qc dir
 mqc_dir=$analysis_dir/qc/data
 
+# serach dir
+val_dir=$analysis_dir/intermed/val
+
 # results files
+pipeline_results=$analysis_dir/intermed/pipeline_results.tsv
 date_check="240125"
 gamma_results="$analysis_dir/intermed/gamma_results_$date_check.csv"
 kraken_results="$analysis_dir/intermed/kraken_results_$date_check.txt"
@@ -55,29 +59,42 @@ source /home/ubuntu/workflows/AR_Workflow/scripts/core_functions.sh
 eval $(parse_yaml ${pipeline_config} "config_")
 
 if [[ $flag_report == "Y" ]]; then
+	echo "--running report"
 	# prep file
 	if [ -f $gamma_results ]; then rm $gamma_results; fi
+	if [ -f $kraken_results ]; then rm $kraken_results; fi
+	if [ -f $val_results ]; then rm $val_results; fi
 
 	# for each file print name of file and all genes
-	for f in $gamma_dir/*.gamma; do
+	for f in $val_dir/*.gamma; do
 		id=`echo $f | cut -f9 -d"/" | sed "s/_ResGANNCBI_20230517_srst2.gamma//g"`
 		line=`awk '{print $1}' $f | sort | uniq | awk '{printf "%s%s",sep,$1; sep=","} END{print ""}' | sed "s/,Gene//g"`
 		echo "$id,$line" >> $gamma_results
 	done
 
 	# get the taxonomic ID
-	awk '{ print $1","$2" }' $kraken_results
+	awk -F"\t" '{ print $1","$2","$13 }' $pipeline_results | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/ /_/g" > tmp_kraken
 
 	# cleanup gamma
 	sed -i "s/-//g" $gamma_results
 
+	# cleanup kraken
+	cat tmp_kraken | sort | uniq > $kraken_results
+	rm tmp_kraken
+
 	# review
-	head $gamma_results
-	echo
-	head $kraken_results
+	# head $gamma_results
+	# cat $kraken_results
 
 	# merge
 	join <(sort $kraken_results) <(sort $gamma_results) -t $',' > $val_results
+	
+	# clean fail
+	sed -i "s/FAIL/Failed_QC/g" $val_results
+
+	# review
+	cat $val_results
+	cat $val_results | wc -l
 fi
 
 if [[ $flag_mqc == "Y" ]]; then

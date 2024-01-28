@@ -29,3 +29,19 @@ message_stats_log(){
 	echo "$msg"
 
 }
+
+handle_fq(){
+	in_fq=$1
+	in_fqID=$2
+	in_treedir=$3
+
+	if [[ ! -f $in_fq/$in_fqID ]]; then
+		if [[ -f $in_treedir/$in_fqID ]]; then 
+			mv $in_treedir/$in_fqID $in_fq/$in_fqID
+		else 
+			echo "missing $in_treedir/$in_fqID"
+			exit
+		fi
+	fi	
+
+}

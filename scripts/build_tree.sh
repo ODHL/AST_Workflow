@@ -59,14 +59,14 @@ samplesheet=$log_dir/manifests/samplesheet_gff.csv
 	
 # set cmd and log
 if [[ $resume == "Y" ]]; then
-	message_cmd_log "----Resuming pipeline at $workingdir"
-    echo "-------Resuming time: `date`" >> $pipeline_log
-	echo "-------Resuming space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
+	echo "----Resuming pipeline at $workingdir"
+    message_cmd_log "-------Resuming time: `date`"
+	message_cmd_log "-------Resuming space: `df . | sed -n '2 p' | awk '{print $5}'`"
     analysis_cmd=`echo $config_analysis_cmd -resume`
 else
-	message_cmd_log "----Starting pipeline at $workingdir"
-	echo "-------Starting time: `date`" >> $pipeline_log
-	echo "-------Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
+	echo "----Starting pipeline at $workingdir"
+	message_cmd_log "-------Starting time: `date`"
+	message_cmd_log "-------Starting space: `df . | sed -n '2 p' | awk '{print $5}'`"
     analysis_cmd=$config_analysis_cmd
 fi
 analysis_cmd_trailing=$config_tree_cmd_trailing
@@ -81,27 +81,12 @@ message_cmd_log "Pipeline version: $ODH_version"
 #############################################################################################
 # Analysis
 #############################################################################################
-handle_fq(){
-	in_fq=$1
-	in_fqID=$2
-	in_treedir=$3
-
-	if [[ ! -f $in_fq/$in_fqID ]]; then
-		if [[ -f $in_treedir/$in_fqID ]]; then 
-			mv $in_treedir/$in_fqID $in_fq/$in_fqID
-		else 
-			echo "missing $in_treedir/$in_fqID"
-			exit
-		fi
-	fi	
-
-}
 if [[ $flag_prep == "Y" ]]; then
 	# create samplesheet
 	if [[ -f $samplesheet ]]; then rm $samplesheet; fi
 	echo "sample,gff,fq1,fq2" > $samplesheet
-
 	message_cmd_log "--Prepping GFF files"
+
 	# create sample log
 	if [[ -f sample_list.txt ]]; then rm sample_list.txt; fi
 	for f in $tree_dir/*gff; do
@@ -113,8 +98,12 @@ if [[ $flag_prep == "Y" ]]; then
 	# read text file
 	IFS=$'\n' read -d '' -r -a sample_list < sample_list.txt
 
-	# move fq's to CFSAN dir
+	## check if there is an input dir
+	if [[ -f $input_dir.tar.gz ]]; then
+		tar -zxf $input_dir.tar.gz --directory $input_dir
+	fi
 	## create samplesheet
+	## move fq's to CFSAN dir
 	for sample_id in ${sample_list[@]}; do
 		gff="$tree_dir/$sample_id.gff"
 		fq1="${sample_id}_1.trim.fastq.gz"
@@ -129,8 +118,9 @@ if [[ $flag_prep == "Y" ]]; then
 		# add to the samplesheet
         echo "${sample_id},$gff,$fq1,$fq2" >> $samplesheet
 	done
-	# cat $samplesheet
-	# ls $tree_dir/input_dir/*
+
+	cat $samplesheet
+	rm sample_list.txt
 fi
 
 if [[ $flag_analysis == "Y" ]]; then
@@ -144,16 +134,8 @@ if [[ $flag_analysis == "Y" ]]; then
 	$pipeline_full_cmd
 
 	# log
-	echo "-------Ending time: `date`" >> $pipeline_log
-	echo "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
-
-	#############################################################################################
-	# CLEANUP
-	#############################################################################################	
-	#remove intermediate files
-	if [[ $flag_cleanup == "Y" ]]; then
-		sudo rm -r --force $pipeline_dir
-	fi
+	message_cmd_log "-------Ending time: `date`"
+	message_cmd_log "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`"
 fi
 
 if [[ $flag_report == "Y" ]]; then
@@ -161,10 +143,18 @@ if [[ $flag_report == "Y" ]]; then
 	cp $workingdir/TREE/core_genome.tree $merged_tree
 	cp $workingdir/CFSAN/snp_distance_matrix.tsv $merged_snp
 
+	#############################################################################################
+	# CLEANUP
+	#############################################################################################	
 	if [[ -f $merged_roary ]] && [[ -f $merged_tree ]] && [[ -f $merged_snp ]]; then
-		if [[ $flag_cleanup == "Y" ]]; then
-			rm -rf $tree_dir
-		fi
 		message_cmd_log "--Pipeline Completed `date`"
+		tar -zcvf $input_dir.tar.gz $input_dir/
+	else
+		message_cmd_log "--Pipeline FAILED `date`"
+		exit
 	fi
+
+	if  [[ $flag_cleanup == "Y" ]]; then
+		sudo rm -r --force $pipeline_dir
+	fi	
 fi
