@@ -2,7 +2,7 @@
 # note: please use spaces instead of tabs, indentation for .text blocks is two spaces
 
 ### report format ###
-logo: 'odh_logo_231222.jpg'
+logo: 'odh_logo_240127.png'
 
 # output fromat, must be one of the following: 'html', 'word', 'both'
 outformat: 'html'
@@ -32,23 +32,15 @@ methods.text: |
 disclaimer.text: |
   The information included in this report should only be used to support infection prevention measures. This report should not be used to guide treatment decisions, nor should it be included in the patient record.
   Whole-genome sequencing analysis is a rapidly evolving technology. Whole-genome sequencing and single nucleotide variant analysis will continue to be adjusted and refined over time due to the varied nature of bacterial genomes, limitations on available reference genomes and continual assessment of the inclusion of mobile genetic elements in this analysis. These results represent the most advanced method currently available for genome comparisons.
-
-### optional report methodology and results text ###
 heatmap.text: |
   The number of Single Nucleotide Polymorphisms (SNPs) between each sample is shown on the heatmap below. The samples are ordered based on the Euclidean distance between each sample.
 tree.text: |
   Phylogenetic trees visualize the relatedness and genetic diversity of samples. Closely related samples will generally share a recent common ancestor. Here a cladogram is used to illustrate relationships, where nodes are labeled with degree of similarity, but where the horizontal lines are not representative of lineage.
 ar_gene_summary.text: |
   This report shows a summary of all antimicrobial resistance genes detected using the ODH [AR pipeline](https://github.com/ODHL/AR_Workflow).
-matrix.text: |
-  Three images are highlighted below. 
-  1) A presence and absence matrix against a tree. 
-  2) A piechart of the pangenome, breaking down the core, soft core, shell and cloud. 
-  3) A pangenome frequency plot.
 
 # tree rooting method, must be one of the following: 
 # 'midpoint', 'unrooted', or a sample id
 root.method: "midpoint"
-
 show.bootstrap: TRUE
 bootstrap.threshold: 80
