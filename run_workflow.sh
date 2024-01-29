@@ -292,7 +292,8 @@ elif [[ "$pipeline" == "report" ]]; then
                 $pipeline_results \
                 $wgs_results \
                 $ncbi_results \
-                $subworkflow
+                $subworkflow \
+                $pipeline_config
 
 #############################################################################################
 # Run cleanup

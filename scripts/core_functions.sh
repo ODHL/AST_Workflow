@@ -45,3 +45,11 @@ handle_fq(){
 	fi	
 
 }
+
+cleanmanifests(){
+	sed -i "s/[_-]ASTVAL//g" $1
+	sed -i "s/[_-]AST//g" $1
+	sed -i "s/-$project_name_full//g" $1
+	sed -i "s/-$project_name//g" $1		
+	sed -i "s/-OH//g" $1		
+}

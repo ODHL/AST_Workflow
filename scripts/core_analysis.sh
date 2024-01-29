@@ -54,13 +54,6 @@ fi
 source $(dirname "$0")/core_functions.sh
 eval $(parse_yaml ${pipeline_config} "config_")
 
-cleanmanifests(){
-	sed -i "s/[_-]ASTVAL//g" $1
-	sed -i "s/[_-]AST//g" $1
-	sed -i "s/-$project_name_full//g" $1
-	sed -i "s/-$project_name//g" $1		
-	sed -i "s/-OH//g" $1		
-}
 
 #########################################################
 # Set dirs, files, args

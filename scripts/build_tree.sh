@@ -98,10 +98,6 @@ if [[ $flag_prep == "Y" ]]; then
 	# read text file
 	IFS=$'\n' read -d '' -r -a sample_list < sample_list.txt
 
-	## check if there is an input dir
-	if [[ -f $input_dir.tar.gz ]]; then
-		tar -zxf $input_dir.tar.gz --directory $input_dir
-	fi
 	## create samplesheet
 	## move fq's to CFSAN dir
 	for sample_id in ${sample_list[@]}; do
@@ -148,7 +144,7 @@ if [[ $flag_report == "Y" ]]; then
 	#############################################################################################	
 	if [[ -f $merged_roary ]] && [[ -f $merged_tree ]] && [[ -f $merged_snp ]]; then
 		message_cmd_log "--Pipeline Completed `date`"
-		tar -zcvf $input_dir.tar.gz $input_dir/
+		tar -zcvf $tree_dir/input_dir.tar.gz $tree_dir/input_dir
 	else
 		message_cmd_log "--Pipeline FAILED `date`"
 		exit
