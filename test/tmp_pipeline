@@ -1,3 +1,0 @@
-sample1 PASS 50 
-sample2 PASS 100 
-sample3 FAIL 20 autofail(20)
