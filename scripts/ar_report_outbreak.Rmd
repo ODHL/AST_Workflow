@@ -1,0 +1,484 @@
+---
+title: "Public Health Whole Genome Sequencing Analysis Report"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    navbar:
+      - { title: "ODHL", href:
+      "https://odh.ohio.gov/know-our-programs/microbiology/microbiology",
+      align_right}
+    logo: "REP_LOGO"
+params:
+  configFILE: "REP_CONFIG"
+  projectname: "REP_PROJID"
+  outdir: "REP_OUT"
+  date: "REP_DATE"
+  sampletable: "REP_ST"
+  snpmatrix: "REP_SNP"
+  tree: "REP_TREE"
+  cgstats: "REP_CORE"
+  arpredictions: "REP_AR"
+  testing: "N"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r libs, echo=FALSE,include=FALSE,warning=FALSE,message=FALSE}
+library(rmarkdown)
+library(argparser)
+library(yaml)
+library(ape)
+library(ggplot2)
+library(plotly)
+library(pander)
+library(kableExtra)
+library(ape)
+library(ggtree)
+library(heatmaply)
+library(phytools)
+library(DT)
+library(RColorBrewer)
+library(ggpubr)
+library(flexdashboard)
+library(crosstalk)
+knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message=FALSE)
+'%ni%' <- function(x,y)!('%in%'(x,y))
+```
+
+```{r args, echo=FALSE,warning=FALSE}
+username="S. Chill"
+reporttype="Outbreak"
+
+#position args
+if (params$testing=="N"){
+  projectname=params$projectname
+  outdir=params$outdir
+  configFILE=params$configFILE
+  date=params$date
+  sampletable=params$sampletable
+  snpmatrix=params$snpmatrix
+  tree=params$tree
+  cgstats=params$cgstats
+  arpredictions=params$arpredictions
+} else {
+  projectname="OH-M6588-231201"
+  outdir="OH-M6588-231201/"
+  date="12/18/23"
+  sampletable="final_report.csv"
+  snpmatrix="snp_distance_matrix.tsv"
+  tree="core_genome.tree"
+  cgstats="core_genome_statistics.txt"
+  arpredictions="ar_predictions.tsv"
+}
+```
+
+```{r prep, echo=FALSE, warning=FALSE}
+# read yaml file
+config <- read_yaml(configFILE)
+
+## set header text
+subHeaderText = paste0(config$sub.title, ": ", reporttype)
+
+## get header table
+headerDF <- data.frame(date=date,project=projectname,name=username)
+
+## get summary text
+summaryTEXT <- config$summary.paragraph
+
+## get disclaimer text
+disclaimerTEXT <- config$disclaimer.text
+
+## get methods text
+methodsTEXT <- config$methods.text
+```
+
+```{r read, echo=FALSE}
+## get sample table
+sampleDF <- read.csv2(sampletable,sep=",")
+sampleDF=subset(sampleDF,species!="species") #handles merged proj dups
+
+# get heatmap
+snpData <- read.csv2(snpmatrix,sep='\t',check.names = F,row.names = 1)
+
+# create species col list
+col_pal=brewer.pal(n = 8, name = "Dark2")
+species_colors=data.frame(unique(sampleDF$species))
+for (rid in rownames(species_colors)){
+  species_colors[rid,"colorID"]=col_pal[as.numeric(rid)]
+}
+colnames(species_colors)=c("species","colID")
+
+# add col metadata
+sampleDF=merge(sampleDF,species_colors, by.x="species", by.y="species")
+
+# get tree
+treepath <- tree
+
+# get cgstats
+cgstats <- read.csv2(cgstats,sep='\t',header = FALSE)
+
+# get ar-summary
+ar_summary <- read.csv2(arpredictions,sep='\t',check.names = F)
+ar_summary$Sample=gsub("_[0-9][0-9][0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary$Sample=gsub("_[0-9][0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary$Sample=gsub("_[0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary$Sample=gsub("_[0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary=ar_summary[!duplicated(ar_summary),]
+
+# create metadata
+generate_ids=function(list_in){
+  tmp_list=which( colnames(sampleDF) %ni% list_in ) -1
+  return(tmp_list)
+}
+id_nums=generate_ids(c("specimen_id","wgs_id","srr_id",
+                       "wgs_date_put_on_sequencer","run_id","auto_qc_outcome"))
+tax_nums=generate_ids(c("specimen_id","species","sequence_classification",
+                        "mlst_1","gamma_beta_lactam_resistance_genes"))
+qc_nums=generate_ids(c("specimen_id","estimated_coverage","genome_length",
+                        "auto_qc_failure_reason"))
+sample_meta=SharedData$new(sampleDF)
+```
+
+Information {data-orientation=columns data-icon="fa-info-circle"}
+=================================================================
+Column {data-width=600}
+-----------------------
+### `r subHeaderText` 
+```{r intro}
+# create table
+colnames(headerDF) <- c("REPORT DATE","PROJECT NAME","PREPARED BY")
+
+# plot table
+pander(headerDF)
+```
+
+### METHODS
+`r methodsTEXT`
+Column {data-width=600}
+-----------------------
+### DISCLAIMER
+`r disclaimerTEXT`
+
+Datatables {data-orientation=columns data-icon="ion-search"}
+=================================================================
+
+Input {.sidebar}
+-----------------------------------------------------------------------
+
+### Filters 
+```{r filter}
+filter_select(
+  id="auto_qc_outcome",
+  label = "QC Status",
+  sharedData = sample_meta,
+  group = ~auto_qc_outcome
+)
+filter_select(
+  id="run_id",
+  label = "Run ID",
+  sharedData = sample_meta,
+  group = ~run_id
+)
+```
+
+Raw {data-width=700 .tabset}
+-----------------------------------------------------------------------
+### Sample
+
+```{r ids, echo=FALSE}
+sample_meta %>%
+  DT::datatable(
+    extensions = c("Buttons","Scroller"),
+    rownames=FALSE,
+    style="bootstrap",
+    width="100%",
+    class="compact",
+    options=list(
+      dom="Blrtrip",
+      deferREander=TRUE,
+      columnDefs=list(
+        list(
+          visible=FALSE,
+          targets=id_nums
+        )
+      ),
+      buttons = list(I("colvis"),"csv","excel")
+      ),
+    colnames = c(
+      "ID" = "specimen_id",
+      "WGS" = "wgs_id",
+      "SRR" = "srr_id",
+      "SeqDate" = "wgs_date_put_on_sequencer",
+      "RunID" = "run_id",
+      "QC" = "auto_qc_outcome"
+    )
+  )
+```
+
+### Taxonomy
+```{r tax, echo=FALSE}
+sample_meta %>%
+  DT::datatable(
+    extensions = c("Buttons","Scroller"),
+    rownames=FALSE,
+    style="bootstrap",
+    width="100%",
+    class="compact",
+    options=list(
+      dom="Blrtrip",
+      deferREander=TRUE,
+      columnDefs=list(
+        list(
+          visible=FALSE,
+          targets=tax_nums
+        )
+      ),
+      buttons = list(I("colvis"),"csv","excel")
+      ),
+    colnames = c(
+      "ID" = "specimen_id",
+      "Species" = "species",
+      "SeqClass" = "sequence_classification",
+      "SeqDate" = "wgs_date_put_on_sequencer",
+      "MLST1" = "mlst_1",
+      "bLac Genes" = "gamma_beta_lactam_resistance_genes"
+    )
+  )
+```
+
+### QC
+```{r qc, echo=FALSE}
+sample_meta %>%
+  DT::datatable(
+    extensions = c("Buttons","Scroller"),
+    rownames=FALSE,
+    style="bootstrap",
+    width="100%",
+    class="compact",
+    options=list(
+      dom="Blrtrip",
+      deferREander=TRUE,
+      columnDefs=list(
+        list(
+          visible=FALSE,
+          targets=qc_nums
+        )
+      ),
+      buttons = list(I("colvis"),"csv","excel")
+      ),
+    colnames = c(
+      "ID" = "specimen_id",
+      "Coverage" = "estimated_coverage",
+      "GenomeLength" = "genome_length",
+      "QC Fail" = "auto_qc_failure_reason"
+    )
+  )
+```
+
+### ARGene Table
+```{r ar_table}
+if(exists('ar_summary')){
+  
+  # determine gene consensus at 50%
+  number_of_samples=round(length(unique(ar_summary$Sample))*.5+.5,0)
+  output_df=data.frame()
+  for (geneID in unique(ar_summary$Gene)){
+    tmp_df=subset(ar_summary,Gene==geneID)
+    if (nrow(tmp_df)>number_of_samples-1){
+      if (nrow(output_df)==0){
+        output_df=tmp_df
+      } else{
+        output_df=rbind(tmp_df,output_df)
+      }
+    }
+  }
+  # strip rownames, order by gene name
+  row.names(output_df) <- NULL
+  output_df <- output_df[order(output_df$Gene),]
+  
+  # if there are consensus genes then print table
+  if (nrow(output_df)==0){
+    print("There are no genes with consensus between at least 50% of samples")
+  } else{
+    DT::datatable(output_df,
+          rownames = FALSE,
+          extensions = 'RowGroup',
+          options = list(rowGroup = list(dataSrc=c(1)),
+                         columnDefs = list(list(visible=FALSE, targets=c(1)))
+                         )
+          )
+  }
+}
+```
+
+Analysis {data-orientation=columns data-icon="ion-android-options"}
+=================================================================
+Column {data-width=800 .tabset}
+-----------------------------------------------------------------------
+### Taxonomy
+```{r counts}
+subset(sampleDF,auto_qc_outcome=="PASS")%>%
+  ggplot(aes(x = species,fill=species)) +
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  facet_grid(~run_id)
+```
+
+### Heatmap
+```{r heatmap}
+collabels=as.data.frame(colnames(snpData))
+colnames(collabels)="specimen_id"
+collabels=merge(collabels,sampleDF[,c("specimen_id","species")])
+
+rowlabels=as.data.frame(rownames(snpData))
+colnames(rowlabels)="specimen_id"
+rowlabels=merge(rowlabels,sampleDF[,c("specimen_id","run_id","species")])
+
+heatmaply(snpData,
+          cellnote=snpData,
+          cellnote_size=8,
+          cellnote_textposition = "middle center",
+          col_side_colors = collabels$species,
+          row_side_colors = rowlabels[,c("run_id","species")],
+          colors = viridis(n = 256, alpha = 1, 
+                           begin = 1, end = 0, option = "viridis"),
+          show_dendrogram = c(TRUE, FALSE),
+          dist_method=config$heat.dist.method, 
+          label_names = c("Row", "Column", "SNPs"))
+```
+
+### Phylogenetic Tree
+```{r tree, message=FALSE}
+if(exists('treepath')){
+  set.seed(42)
+  tree <- ape::read.tree(treepath)
+  if(exists('cgstats')){
+    paste("Core Genes Identified: ",cgstats[cgstats$V1 == 'Core genes',3])
+    paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])
+  }
+  
+  # set the root method
+  if(config$root.method == 'midpoint'){
+    tree <- midpoint.root(tree)
+  } else if(config$root.method == 'unrooted'){
+    tree <- tree
+  } else {
+    node <- match(config$root.method, tree$tip.label)
+    if(is.na(node)){
+      message('Root sample ID not found')
+      quit(save="no", status=1)
+    } else {
+      tree <- reroot(tree,node)
+    }
+  }
+  
+  # metadata
+  id <- tree$tip.label
+  
+  # create colors label
+  ##doing here since order might be different than the sampleDF
+  col_colors_label=id
+  for (sid in col_colors_label){
+    col_colors_label=gsub(sid,
+                          subset(sampleDF,
+                                 specimen_id==sid)$colID[1],col_colors_label)
+  }
+  col_colors_label
+  
+  # create tibble of ID's
+  dat <- tibble::tibble(id = id)
+  
+  # generate tree
+  ggtree_basic=ggtree(tree,branch.length="none") +  
+    geom_nodepoint() + 
+    geom_tiplab(size=3) + 
+    geom_tree() + 
+    theme_tree() + 
+    geom_tippoint(color=col_colors_label)
+  
+  # pull data to create node labels
+  d <- ggtree_basic$data
+  bs <- d[!d$isTip,]
+  bs$label <- as.numeric(bs$label)
+  #bs <- bs[bs$label > config$bootstrap.threshold,]
+  ggtree_plot <- ggtree_basic + 
+    geom_text(data=bs,aes(label=label,hjust=-.4),size=2) + ggplot2::xlim(0, 25)
+  ggtree_plot
+  
+  # create df for bar labels
+  sampleDF$bar=1
+  d1 <- sampleDF[,c("specimen_id","bar","colID","species")]
+  d1$specimen_id=as.character(d1$specimen_id)
+  sorted_labels=as.data.frame(d)[1:nrow(sampleDF),]
+  sorted_labels=sorted_labels[rev(order(sorted_labels$y)),]$label
+  d1=d1[match(sorted_labels, d1$specimen_id),]
+  d1$specimen_id=factor(d1$specimen_id,levels=rev(d1$specimen_id))
+  
+  d2 <- sampleDF[,c("specimen_id","bar","colRUN","run_id")]
+  d2$specimen_id=as.character(d2$specimen_id)
+  sorted_labels=as.data.frame(d)[1:nrow(sampleDF),]
+  sorted_labels=sorted_labels[rev(order(sorted_labels$y)),]$label
+  d2=d2[match(sorted_labels, d2$specimen_id),]
+  d2$specimen_id=factor(d2$specimen_id,levels=rev(d1$specimen_id))
+  
+  p2=ggplot(d1, aes(x =specimen_id, y = bar, fill = specimen_id)) +  
+    geom_bar(stat = "identity") +
+    geom_text( aes(label = species),
+               colour = "white", size = 2,y=0.1,hjust=0)+
+    coord_flip() +
+    theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())+
+    theme(legend.position="none")+
+    scale_fill_manual(values=c(rev(d1$colID)))
+  p3=ggplot(d2, aes(x =specimen_id, y = bar, fill = specimen_id)) +  
+    geom_bar(stat = "identity") +
+    geom_text( aes(label = run_id),
+               colour = "white", size = 2,y=0.1,hjust=0)+
+    coord_flip() +
+    theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())+
+    theme(legend.position="none")+
+    scale_fill_manual(values=c(rev(d2$colRUN)))
+  
+  ggarrange(ggtree_plot,p2,p3, widths = c(2,.9,.8),ncol=3)
+}
+```
+
+### ARGene Summary
+```{r ar_summary}
+if(exists('ar_summary')){
+  # if there are consensus genes then print table
+  if (nrow(output_df)==0){
+    print("There are no genes with consensus between at least 50% of samples")
+  } else{
+    merge(sampleDF,output_df, by.x="specimen_id",
+      by.y="Sample")[,c("specimen_id","Gene","species","run_id")] %>% 
+      ggplot(aes(x = Gene,fill=species)) +
+      geom_bar() + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+      facet_grid(~run_id)
+  }
+}
+```
+
+Column {data-width=200}
+-----------------------------------------------------------------------
+### Notes
+
+#### Heatmap
+`r config$heatmap.outbreak.text`
+
+#### Phylogenetic Tree
+`r config$tree.text`
+`r if(exists('treepath') & exists('cgstats')){paste("Core Genes Identified: ",cgstats[cgstats$V1 == 'Core genes',3],'\n')}`
+`r if(exists('treepath') & exists('cgstats')){paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])}`
+
+#### ARGene
+`r config$ar_gene_summary.text`

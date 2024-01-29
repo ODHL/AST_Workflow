@@ -1,5 +1,5 @@
 # params
-batch_limit: 20
+batch_limit: 8
 
 # tools
 basespace_cmd: "/home/ubuntu/tools/basespace"
@@ -27,6 +27,8 @@ MLST: "pulled from from PubMLST.org 2023-05-02"
 
 wgsID_script: "/home/ubuntu/workflows/AR_workflow/scripts/core_wgs_id.sh"
 metadata_file: "METADATAFILE"
+
+logo_file: "/home/ubuntu/workflows/AR_workflow/assets/odh_logo_240127.png"
 
 ###############################
 # PARAMS REQUIRED
