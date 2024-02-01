@@ -73,7 +73,7 @@ if [[ $flag_report == "Y" ]]; then
 	done
 
 	# get the taxonomic ID
-	awk -F"\t" '{ print $1","$2","$13 }' $pipeline_results | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/ /_/g" > tmp_kraken
+	awk -F";" '{ print $1","$2","$13 }' $pipeline_results | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/ /_/g" > tmp_kraken
 
 	# cleanup gamma
 	sed -i "s/-//g" $gamma_results
