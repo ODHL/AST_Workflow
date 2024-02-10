@@ -109,14 +109,6 @@ for (rid in rownames(species_colors)){
 }
 colnames(species_colors)=c("species","colID")
 
-# create run col list
-col_pal=brewer.pal(n = 8, name = "Set1")
-run_colors=data.frame(unique(sampleDF$run_id))
-for (rid in rownames(run_colors)){
-  run_colors[rid,"colorRUN"]=col_pal[as.numeric(rid)]
-}
-colnames(run_colors)=c("run_id","colRUN")
-
 # add col metadata
 sampleDF=merge(sampleDF,species_colors, by.x="species", by.y="species")
 
@@ -140,7 +132,7 @@ generate_ids=function(list_in){
   return(tmp_list)
 }
 id_nums=generate_ids(c("specimen_id","wgs_id","srr_id",
-                       "wgs_date_put_on_sequencer","auto_qc_outcome"))
+                       "wgs_date_put_on_sequencer","run_id","auto_qc_outcome"))
 tax_nums=generate_ids(c("specimen_id","species","sequence_classification",
                         "mlst_1","gamma_beta_lactam_resistance_genes"))
 qc_nums=generate_ids(c("specimen_id","estimated_coverage","genome_length",
@@ -182,6 +174,12 @@ filter_select(
   sharedData = sample_meta,
   group = ~auto_qc_outcome
 )
+filter_select(
+  id="run_id",
+  label = "Run ID",
+  sharedData = sample_meta,
+  group = ~run_id
+)
 ```
 
 Raw {data-width=700 .tabset}
@@ -208,10 +206,11 @@ sample_meta %>%
       buttons = list(I("colvis"),"csv","excel")
       ),
     colnames = c(
-      "eLIMS_ID" = "specimen_id",
+      "ID" = "specimen_id",
       "WGS" = "wgs_id",
       "SRR" = "srr_id",
       "SeqDate" = "wgs_date_put_on_sequencer",
+      "RunID" = "run_id",
       "QC" = "auto_qc_outcome"
     )
   )
@@ -238,18 +237,47 @@ sample_meta %>%
       buttons = list(I("colvis"),"csv","excel")
       ),
     colnames = c(
-      "eLIMS_ID" = "specimen_id",
+      "ID" = "specimen_id",
       "Species" = "species",
-      "Sequence_Classification" = "sequence_classification",
+      "SeqClass" = "sequence_classification",
       "SeqDate" = "wgs_date_put_on_sequencer",
       "MLST1" = "mlst_1",
-      "Beta-lactamase resistant genes" = "gamma_beta_lactam_resistance_genes"
+      "bLac Genes" = "gamma_beta_lactam_resistance_genes"
     )
   )
 ```
 
-```{r ar_table, echo=FALSE}
+### QC
+```{r qc, echo=FALSE}
+sample_meta %>%
+  DT::datatable(
+    extensions = c("Buttons","Scroller"),
+    rownames=FALSE,
+    style="bootstrap",
+    width="100%",
+    class="compact",
+    options=list(
+      dom="Blrtrip",
+      deferREander=TRUE,
+      columnDefs=list(
+        list(
+          visible=FALSE,
+          targets=qc_nums
+        )
+      ),
+      buttons = list(I("colvis"),"csv","excel")
+      ),
+    colnames = c(
+      "ID" = "specimen_id",
+      "Coverage" = "estimated_coverage",
+      "GenomeLength" = "genome_length",
+      "QC Fail" = "auto_qc_failure_reason"
+    )
+  )
+```
+
 ### ARGene Table
+```{r ar_table}
 if(exists('ar_summary')){
   
   # determine gene consensus at 50%
@@ -268,7 +296,19 @@ if(exists('ar_summary')){
   # strip rownames, order by gene name
   row.names(output_df) <- NULL
   output_df <- output_df[order(output_df$Gene),]
-
+  
+  # if there are consensus genes then print table
+  if (nrow(output_df)==0){
+    print("There are no genes with consensus between at least 50% of samples")
+  } else{
+    DT::datatable(output_df,
+          rownames = FALSE,
+          extensions = 'RowGroup',
+          options = list(rowGroup = list(dataSrc=c(1)),
+                         columnDefs = list(list(visible=FALSE, targets=c(1)))
+                         )
+          )
+  }
 }
 ```
 
@@ -281,7 +321,8 @@ Column {data-width=800 .tabset}
 subset(sampleDF,auto_qc_outcome=="PASS")%>%
   ggplot(aes(x = species,fill=species)) +
   geom_bar() + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  facet_grid(~run_id)
 ```
 
 ### Heatmap
@@ -292,14 +333,14 @@ collabels=merge(collabels,sampleDF[,c("specimen_id","species")])
 
 rowlabels=as.data.frame(rownames(snpData))
 colnames(rowlabels)="specimen_id"
-rowlabels=merge(rowlabels,sampleDF[,c("specimen_id","species")])
+rowlabels=merge(rowlabels,sampleDF[,c("specimen_id","run_id","species")])
 
 heatmaply(snpData,
           cellnote=snpData,
           cellnote_size=8,
           cellnote_textposition = "middle center",
           col_side_colors = collabels$species,
-          row_side_colors = rowlabels[,c("species")],
+          row_side_colors = rowlabels[,c("run_id","species")],
           colors = viridis(n = 256, alpha = 1, 
                            begin = 1, end = 0, option = "viridis"),
           show_dendrogram = c(TRUE, FALSE),
@@ -374,6 +415,13 @@ if(exists('treepath')){
   d1=d1[match(sorted_labels, d1$specimen_id),]
   d1$specimen_id=factor(d1$specimen_id,levels=rev(d1$specimen_id))
   
+  d2 <- sampleDF[,c("specimen_id","bar","colRUN","run_id")]
+  d2$specimen_id=as.character(d2$specimen_id)
+  sorted_labels=as.data.frame(d)[1:nrow(sampleDF),]
+  sorted_labels=sorted_labels[rev(order(sorted_labels$y)),]$label
+  d2=d2[match(sorted_labels, d2$specimen_id),]
+  d2$specimen_id=factor(d2$specimen_id,levels=rev(d1$specimen_id))
+  
   p2=ggplot(d1, aes(x =specimen_id, y = bar, fill = specimen_id)) +  
     geom_bar(stat = "identity") +
     geom_text( aes(label = species),
@@ -386,8 +434,20 @@ if(exists('treepath')){
         axis.ticks.y=element_blank())+
     theme(legend.position="none")+
     scale_fill_manual(values=c(rev(d1$colID)))
-
-  ggarrange(ggtree_plot,p2, widths = c(2.5,1),ncol=2)
+  p3=ggplot(d2, aes(x =specimen_id, y = bar, fill = specimen_id)) +  
+    geom_bar(stat = "identity") +
+    geom_text( aes(label = run_id),
+               colour = "white", size = 2,y=0.1,hjust=0)+
+    coord_flip() +
+    theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())+
+    theme(legend.position="none")+
+    scale_fill_manual(values=c(rev(d2$colRUN)))
+  
+  ggarrange(ggtree_plot,p2,p3, widths = c(2,.9,.8),ncol=3)
 }
 ```
 
@@ -402,7 +462,8 @@ if(exists('ar_summary')){
       by.y="Sample")[,c("specimen_id","Gene","species","run_id")] %>% 
       ggplot(aes(x = Gene,fill=species)) +
       geom_bar() + 
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+      facet_grid(~run_id)
   }
 }
 ```

@@ -38,7 +38,7 @@ if [[ $flag_ids == "Y" ]]; then
             echo "--sample: $sample_id"
 
             # check the QC status of the sample
-            check=`cat $pipeline_results | grep $sample_id | awk '{print $2}'`
+            check=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $2}'`
 
             # if the sample passed QC, assign a WGS ID
             if [[ $check == "PASS" ]]; then
@@ -55,7 +55,7 @@ if [[ $flag_ids == "Y" ]]; then
                     if [[ $first_grab == "Y" ]]; then
                         echo "--pulling ID from cache"
                         sed -i '/^$/d' $cached_db
-                        last_saved_id=`tail -n1 $cached_db | awk -F"," '{print $1}' | cut -f2 -d"-"`
+                        last_saved_id=`tail -n1 $cached_db | awk -F";" '{print $1}' | cut -f2 -d"-"`
                         echo "last saved: $last_saved_id"
                         stripped_id=`echo "${last_saved_id#"${last_saved_id%%[!0]*}"}"`
                         echo "stripped $stripped_id"
