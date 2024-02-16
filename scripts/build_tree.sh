@@ -144,6 +144,9 @@ if [[ $flag_report == "Y" ]]; then
 	#############################################################################################	
 	if [[ -f $merged_roary ]] && [[ -f $merged_tree ]] && [[ -f $merged_snp ]]; then
 		message_cmd_log "--Pipeline Completed `date`"
+		rm $tree_dir/input_dir/*/*fasta $tree_dir/input_dir/*/*vcf $tree_dir/input_dir/*/*sam $tree_dir/input_dir/*/*txt 
+		rm $tree_dir/input_dir/*/*ba* $tree_dir/input_dir/*/*intervals $tree_dir/input_dir/*/*pile*
+		rm -rf $tree_dir/input_dir/*/metrics
 		tar -zcvf $tree_dir/input_dir.tar.gz $tree_dir/input_dir
 	else
 		message_cmd_log "--Pipeline FAILED `date`"

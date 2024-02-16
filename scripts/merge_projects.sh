@@ -2,82 +2,62 @@
 #########################################################
 # ARGS
 ########################################################
-project_name_list=$1
+sample_name_list=$1
 merge_id=$2
 
 #########################################################
 # Pipeline controls
 ########################################################
-project_output=/home/ubuntu/output/$merge_id
 
 #########################################################
 # Files, dirs
 ########################################################
-intermed_dir=$project_output/analysis/intermed
-qc_dir=$project_output/analysis/qc
-tree_dir=$project_output/analysis/intermed/tree
-input_dir=$project_output/analysis/intermed/tree/input_dir
-val_dir=$project_output/analysis/intermed/val
-merged_results=$intermed_dir/pipeline_results.tsv
-final_results=$project_output/analysis/reports/final_report.csv
+wgs_file="/home/ubuntu/workflows/AR_Workflow/wgs_db/wgs_db_master.csv"
+merged_wgs="home/ubuntu/$merged_id/analysis/intermed/pipeline_results_wgs.tsv"
+touch $merged_wgs
 
 #########################################################
 # Workflow
 ########################################################
-# create project list
-IFS=',' read -r -a project_list <<< "$project_name_list"
+if [[ $flag == "PRE" ]]; then
+    # create samplesheet
+    samplesheet=$log_dir/manifests/samplesheet_01.csv
+    echo "sample,fastq_1,fastq_2" > $samplesheet
 
-# create merged result
-if [[ -f $merged_results ]]; then rm $merged_results; fi
-touch $merged_results    
-if [[ -f $final_results ]]; then rm $final_results; fi
-touch $final_results    
+    # create pipeline dir
+    pipeline_batch_dir= $output_dir/pipeline/batch_01
 
-# prepare the projects
-for pid in ${project_list[@]}; do
-    echo "--processing $pid"
+    #remove previous versions of batch log
+    batch_manifest=$log_dir/manifests/batch_01.txt
+    if [[ -f $batch_manifest ]]; then rm $batch_manifest; fi
+
+    ## tmp dir
+    tmp_dir=$output_dir/tmp
+
+    # create sample list
+    IFS=',' read -r -a sample_list <<< "$sample_name_list"
+
+    # prepare the samples
+    for sample_id in ${sample_list[@]}; do
+        echo "--processing $sample_id"
+        
+        # create samplesheet
+        echo "${sample_id},$pipeline_batch_dir/$sample_id.R1.fastq.gz,$pipeline_batch_dir/$sample_id.R2.fastq.gz">>$samplesheet
+
+        #echo sample id to the batch
+        echo ${sample_id} >> $batch_manifest
+        
+        # download files
+        $config_basespace_cmd download biosample --quiet -n "${sample_id}" -o $tmp_dir
+    done
+else
     
-    # set dirs and files
-    proj_output="/home/ubuntu/output/$pid"
-    proj_intermed="$proj_output/analysis/intermed"
+    # create sample list
+    IFS=',' read -r -a sample_list <<< "$sample_name_list"
 
-    proj_results=$proj_intermed/pipeline_results.tsv
-    proj_final=$proj_output/analysis/reports/final_results.tsv
-    proj_qcdir="$proj_output/analysis/qc"
-    proj_treedir="$proj_intermed/tree"
-    proj_input_dir=$proj_treedir
-    proj_val_dir="$proj_intermed/val"
-
-    ## check if there is an input dir
-    ## if there is, make sure that it's untarred
-	if [[ -f $proj_input_dir.tar.gz ]]; then
-		tar -zxf $proj_input_dir.tar.gz --directory $input_dir
-	fi
-
-    # check files
-    file_list=($proj_results $proj_final)
-    for file_check in ${file_list[@]} ; do
-        if [[ ! -f $file_check ]]; then
-            echo "----MISSING FILE: $file_check"
-            exit
-        else
-            echo "----PASS"
-        fi
+    # prepare the samples
+    for sample_id in ${sample_list[@]}; do
+        awk '{print $2","$1}' $wgs_file | grep "$sample_id" >> $merged_wgs
     done
 
-    dir_list=($proj_qcdir $proj_treedir $proj_val_dir)
-    for dir_check in ${dir_list[@]} ; do
-        if [[ ! -d $dir_list ]]; then
-            echo "----MISSING DIR: $dir_list"
-            exit
-        else
-            echo "----PASS"
-        fi
-    done
-    # cp each file to joint dir
-	cat $proj_results >> $merged_results
-    cat $proj_final >> $final_results
-	cp -r $proj_qcdir/* $qc_dir
-	cp -r $proj_treedir/* $tree_dir
-    cp -r $proj_val_dir/* $val_dir
-done
+fi

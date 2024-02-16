@@ -84,16 +84,16 @@ project_name_full=$(echo $project_id | sed 's:/*$::')
 project_name=$(echo $project_id | cut -f1 -d "_" | cut -f1 -d " ")
 
 # set date
-date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
-
+proj_date=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//' | sed "s/_SARS//g"`
+today_date=$(date '+%Y-%m-%d'); today_date=`echo $today_date | sed "s/-//g"`
 #############################################################################################
 # Dir, Configs
 #############################################################################################
 # set dirs
 output_dir="/home/ubuntu/output/$project_name"
 log_dir=$output_dir/logs
-analysis_dir=$output_dir/analysis
 tmp_dir=$output_dir/tmp
+analysis_dir=$output_dir/analysis
 ar_dir=$output_dir/ar
 
 # set files
@@ -102,19 +102,11 @@ pipeline_results=$analysis_dir/intermed/pipeline_results.tsv
 wgs_results=$analysis_dir/intermed/pipeline_results_wgs.tsv
 ncbi_results=$analysis_dir/intermed/pipeline_results_ncbis.csv
 
-final_results=$analysis_dir/reports/final_results_$date_stamp.csv
+final_results=$analysis_dir/reports/final_results_$today_date.csv
 pipeline_log=$log_dir/pipeline_log.txt
 multiqc_config="$log_dir/config/config_multiqc.yaml"
 pipeline_config="$log_dir/config/config_pipeline.yaml"
 ar_config="$log_dir/config/config_ar.config"
-
-# ncbi dir to hold until completion of sampling
-ncbi_hold="../ncbi_hold/$project_id"
-
-############################################
-qc_dir=$output_dir/qc
-intermed_dir=$analysis_dir/intermed
-intermed_sample_dir=$intermed_dir/sample_level_data/assembly
 
 #############################################################################################
 #############################################################################################
@@ -159,8 +151,15 @@ elif [[ "$pipeline" == "phaseM" ]]; then
         # init
         bash run_workflow.sh -p init -n $project_id
 
-        # run merge
-        bash run_workflow.sh -p merge -n $project_id -m $merged_projects
+        # run merged analysis
+        bash run_workflow.sh -p merge -n $project_id -m $merged_projects -s PRE
+
+        # run analysis
+        bash run_workflow.sh -p analysis -n $project_id -s ANALZYE
+        bash run_workflow.sh -p analysis -n $project_id -s POST
+
+        # run merged post
+        bash run_workflow.sh -p merge -n $project_id -m $merged_projects -s POST
 
         # run tree
         bash run_workflow.sh -p tree -n $project_id -s ALL
@@ -175,33 +174,21 @@ elif [[ "$pipeline" == "phaseM" ]]; then
 #############################################################################################
 ################################## Run init
 elif [[ "$pipeline" == "init" ]]; then
-        # make directories, logs
-        if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
-
         # parent
-        dir_list=(logs pipeline tmp analysis ncbi)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi; done
-
-	## ncbi
-	dir_list=(data)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/ncbi/$pd ]]; then mkdir -p $output_dir/ncbi/$pd; fi; done
+        dir_list=(logs pipeline tmp analysis ncbi/data)
+        for pd in "${dir_list[@]}"; do makeDirs $output_dir/$pd; done
 
         ## logs
-	dir_list=(config manifests pipeline)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $log_dir/$pd ]]; then mkdir -p $log_dir/$pd; fi; done
-
-        dir_list=(complete)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $log_dir/manifests/$pd ]]; then mkdir -p $log_dir/manifests/$pd; fi; done
+	dir_list=(config manifests/complete pipeline)
+        for pd in "${dir_list[@]}"; do makeDirs $log_dir/$pd; done
+	touch $log_dir/manifests/sample_ids.txt
 
         ## analysis
-        dir_list=(intermed qc reports)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi; done
+        dir_list=(intermed qc/data reports)
+        for pd in "${dir_list[@]}"; do makeDirs $analysis_dir/$pd; done
 	
         dir_list=(tree val)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/intermed/$pd ]]; then mkdir -p $analysis_dir/intermed/$pd; fi; done
-
-        dir_list=(data)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/qc/$pd ]]; then mkdir -p $analysis_dir/qc/$pd; fi; done
+        for pd in "${dir_list[@]}"; do makeDirs $analysis_dir/intermed/$pd; done
 
         ##log file
         touch $pipeline_log
@@ -226,15 +213,8 @@ elif [[ "$pipeline" == "init" ]]; then
 
 ################################## Run analysis
 elif [[ "$pipeline" == "analysis" ]]; then
-        message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- STARTING ANALYSIS ---"
-        message_cmd_log "------------------------------------------------------------------------"
-
         # check initialization was completed
         check_initialization
-
-        # Eval YAML args
-        date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
 
         # run pipelien
         bash scripts/core_analysis.sh \
@@ -242,7 +222,7 @@ elif [[ "$pipeline" == "analysis" ]]; then
                 "${project_name_full}" \
                 "${pipeline_config}" \
                 "${multiqc_config}" \
-                "${date_stamp}" \
+                "${proj_date}" \
                 "${pipeline_log}" \
                 "${subworkflow}" \
                 "${resume}" \
@@ -260,30 +240,20 @@ elif [[ "$pipeline" == "tree" ]]; then
 
 ################################## Run ID
 elif [[ "$pipeline" == "wgs" ]]; then
-        message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- ASSIGNING IDS ---"
-        bash scripts/core_wgs_id.sh $analysis_dir $project_name $pipeline_results $wgs_results
+        bash scripts/core_wgs_id.sh \
+                $analysis_dir \
+                $project_name \
+                $pipeline_results \
+                $wgs_results
 ################################## Run NCBI
-elif [[ "$pipeline" == "ncbi_upload" ]]; then
-        message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- PREPARING NCBI UPLOAD ---"
-        message_cmd_log "------------------------------------------------------------------------"
-        
+elif [[ "$pipeline" == "ncbi_upload" ]]; then        
         bash scripts/core_ncbi.sh \
         $output_dir $project_name $pipeline_config $pipeline_results $wgs_results $ncbi_results "UPLOAD"
 elif [[ "$pipeline" == "ncbi_download" ]]; then        
-        message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- PREPARING NCBI DOWNLOAD ---"
-        message_cmd_log "------------------------------------------------------------------------"
-        
         bash scripts/core_ncbi.sh \
         $output_dir $project_name $pipeline_config $pipeline_results $wgs_results $ncbi_results "DOWNLOAD"
 ################################## Run reporting
 elif [[ "$pipeline" == "report" ]]; then
-        message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- STARTING REPORTING ---"
-        message_cmd_log "------------------------------------------------------------------------"
-        bash scripts/core_report.sh \
                 $output_dir \
                 $project_name \
                 $pipeline_results \
@@ -292,27 +262,13 @@ elif [[ "$pipeline" == "report" ]]; then
                 $subworkflow \
                 $pipeline_config
 
-################################## Run cleanup
-elif [[ "$pipeline" == "cleanup" ]]; then
-        message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- STARTING CLEANUP ---"
-        bash scripts/core_cleanup.sh \
-                "${output_dir}" \
-                "${project_name_full}" \
-                "${pipeline_config}"
-
 ################################## Run merge
 elif [[ "$pipeline" == "merge" ]]; then
-        message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- STARTING MERGING ---"
         bash scripts/merge_projects.sh \
                 "${merged_projects}" \
                 "${project_id}"
 ######################## Run validation
 elif [[ "$pipeline" == "validation" ]]; then
-        message_cmd_log "------------------------------------------------------------------------"
-        message_cmd_log "--- STARTING VALIDATION ---"
-        
         # generate report
         bash scripts/ast_validation.sh $subworkflow $project_name_full $output_dir $pipeline_log
 fi

@@ -74,6 +74,7 @@ if [[ $flag_basic == "Y" ]]; then
     for id in "${sample_list[@]}"; do
         # set id
         specimen_id=$id
+        echo $specimen_id
         
         # check WGS ID, if available
         if [[ -f $wgs_results ]]; then 
@@ -94,8 +95,9 @@ if [[ $flag_basic == "Y" ]]; then
         run_id=$project_id
         
         # determine row 
+        cat $pipeline_results | grep "$specimen_id" | awk -F";" '{print $1}'
         SID=$(awk -F";" -v sid=$specimen_id '{ if ($1 == sid) print NR }' $pipeline_results)
-    
+
         # pull metadata
         Auto_QC_Outcome=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $2}'`
         Estimated_Coverage=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $4}'`
