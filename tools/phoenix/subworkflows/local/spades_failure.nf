@@ -16,6 +16,7 @@ workflow SPADES_WF {
         fastp_raw_qc      // channel: tuple (meta) path(fastp_raw_qc): GATHERING_READ_QC_STATS.out.fastp_raw_qc
         fullgene_results  // channel: tuple (meta) path(fullgene_results): SRST2_TRIMD_AR.out.fullgene_results
         report            // channel: tuple (meta) path(report): KRAKEN2_TRIMD.out.report
+        krona_html        // channel: tuple (meta) path(krona_html): KRAKEN2_TRIMD.out.krona_html
         k2_bh_summary     // channel: tuple (meta) path(k2_bh_summary): KRAKEN2_TRIMD.out.k2_bh_summary
         extended_qc
 
@@ -29,7 +30,8 @@ workflow SPADES_WF {
         .join(k2_bh_summary.map{             meta, ksummary       -> [[id:meta.id],ksummary]},       by: [0])\
         .join(fastp_raw_qc.map{              meta, fastp_raw_qc   -> [[id:meta.id],fastp_raw_qc]},   by: [0])\
         .join(fastp_total_qc.map{            meta, fastp_total_qc -> [[id:meta.id],fastp_total_qc]}, by: [0])\
-        .join(report.map{                    meta, report         -> [[id:meta.id],report]},         by: [0])
+        .join(report.map{                    meta, report         -> [[id:meta.id],report]},         by: [0])\
+        .join(krona_html.map{                meta, krona_html     -> [[id:meta.id],krona_html]},     by: [0])
 
         // Add in full path to outdir into the channel so each sample has a the path to go with it. If you don't do this then only one sample goes through pipeline
         passing_reads_ch = passing_reads_ch.combine(outdir_path)
@@ -48,14 +50,15 @@ workflow SPADES_WF {
 
             // Getting ID from either FastANI or if fails, from Kraken2
             DETERMINE_TAXA_ID_FAILURE (
-                best_hit_ch, params.taxa
+                best_hit_ch, params.nodes, params.names
             )
             ch_versions = ch_versions.mix(DETERMINE_TAXA_ID_FAILURE.out.versions)
 
-            pipeline_stats_ch = fastp_raw_qc.map{            meta, fastp_raw_qc    -> [[id:meta.id],fastp_raw_qc]}\
+            pipeline_stats_ch = fastp_raw_qc.map{            meta, fastp_raw_qc     -> [[id:meta.id],fastp_raw_qc]}\
             .join(fastp_total_qc.map{                        meta, fastp_total_qc   -> [[id:meta.id],fastp_total_qc]},   by: [0])\
             .join(fullgene_results.map{                      meta, fullgene_results -> [[id:meta.id],fullgene_results]}, by: [0])\
             .join(report.map{                                meta, report           -> [[id:meta.id],report]},           by: [0])\
+            .join(krona_html.map{                            meta, html             -> [[id:meta.id],html]},             by: [0])\
             .join(k2_bh_summary.map{                         meta, ksummary         -> [[id:meta.id],ksummary]},         by: [0])\
             .join(DETERMINE_TAXA_ID_FAILURE.out.taxonomy.map{meta, taxonomy         -> [[id:meta.id],taxonomy]},         by: [0])
 
@@ -85,13 +88,14 @@ workflow SPADES_WF {
 
             // Getting ID from either FastANI or if fails, from Kraken2
             DETERMINE_TAXA_ID_FAILURE (
-                best_hit_ch, params.taxa
+                best_hit_ch, params.nodes, params.names
             )
             ch_versions = ch_versions.mix(DETERMINE_TAXA_ID_FAILURE.out.versions)
 
             pipeline_stats_ch = fastp_raw_qc.map{            meta, fastp_raw_qc     -> [[id:meta.id],fastp_raw_qc]}\
             .join(fastp_total_qc.map{                        meta, fastp_total_qc  -> [[id:meta.id],fastp_total_qc]},   by: [0])\
             .join(report.map{                                meta, report          -> [[id:meta.id],report]},           by: [0])\
+            .join(krona_html.map{                            meta, html            -> [[id:meta.id],html]},             by: [0])\
             .join(k2_bh_summary.map{                         meta, ksummary        -> [[id:meta.id],ksummary]},         by: [0])\
             .join(DETERMINE_TAXA_ID_FAILURE.out.taxonomy.map{meta, taxonomy        -> [[id:meta.id],taxonomy]},         by: [0])\
 
@@ -121,6 +125,7 @@ workflow SPADES_WF {
         ch_versions = ch_versions.mix(CREATE_SUMMARY_LINE_FAILURE.out.versions)
 
         // Defining out channel
+        //single end needs to be true for kraken2 weighted and assembled steps
         spades_ch = SPADES.out.scaffolds.map{meta, scaffolds -> [ [id:meta.id, single_end:true], scaffolds]}
 
     emit:
