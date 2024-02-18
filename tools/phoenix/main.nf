@@ -29,11 +29,12 @@ if (params.kraken2db == null) { exit 1, 'Input path to kraken2db not specified!'
 ========================================================================================
 */
 
-include { PHOENIX_EXTERNAL       } from './workflows/phoenix'
-include { PHOENIX_EXQC           } from './workflows/cdc_phoenix'
-include { SCAFFOLDS_EXTERNAL     } from './workflows/scaffolds'
-include { SCAFFOLDS_EXQC         } from './workflows/cdc_scaffolds'
-include { SRA_PREP               } from './workflows/sra_prep'
+include { PHOENIX_EXTERNAL_SLIM     } from './workflows/phoenix_slim'
+include { PHOENIX_EXTERNAL          } from './workflows/phoenix'
+include { PHOENIX_EXQC              } from './workflows/cdc_phoenix'
+include { SCAFFOLDS_EXTERNAL        } from './workflows/scaffolds'
+include { SCAFFOLDS_EXQC            } from './workflows/cdc_scaffolds'
+include { SRA_PREP                  } from './workflows/sra_prep'
 
 //
 // WORKFLOW: Run main cdcgov/phoenix analysis pipeline
@@ -72,7 +73,7 @@ workflow PHOENIX {
 // WORKFLOW: Run internal version of cdcgov/phoenix analysis pipeline that includes BUSCO, SRST2 and KRAKEN_ASMBLED
 //
 //
-// WORKFLOW: Run main cdcgov/phoenix analysis pipeline
+// WORKFLOW: Run main ODHL phoenix analysis pipeline
 //
 workflow PHOENIX_SLIM {
     // Validate input parameters
