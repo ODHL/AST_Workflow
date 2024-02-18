@@ -484,13 +484,6 @@ workflow PHOENIX_EXTERNAL_SLIM {
         amrfinder_output = AMRFINDERPLUS_RUN.out.report
         gamma_ar         = GAMMA_AR.out.gamma
         phx_summary     = GATHER_SUMMARY_LINES.out.summary_report
-        //output for phylophoenix
-        griphin_tsv      = GRIPHIN.out.griphin_report
-        griphin_excel    = GRIPHIN.out.griphin_tsv_report
-        dir_samplesheet  = GRIPHIN.out.converted_samplesheet
-        //output for ncbi upload 
-        ncbi_sra_sheet       = params.create_ncbi_sheet ? CREATE_NCBI_UPLOAD_SHEET.out.ncbi_sra : null
-        ncbi_biosample_sheet = params.create_ncbi_sheet ? CREATE_NCBI_UPLOAD_SHEET.out.ncbi_biosample : null
 }
 
 /*

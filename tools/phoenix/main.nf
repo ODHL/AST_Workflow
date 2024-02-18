@@ -71,6 +71,36 @@ workflow PHOENIX {
 //
 // WORKFLOW: Run internal version of cdcgov/phoenix analysis pipeline that includes BUSCO, SRST2 and KRAKEN_ASMBLED
 //
+//
+// WORKFLOW: Run main cdcgov/phoenix analysis pipeline
+//
+workflow PHOENIX_SLIM {
+    // Validate input parameters
+    // Check input path parameters to see if they exist
+    def checkPathParamList = [ params.input, params.multiqc_config, params.kraken2db] //removed , params.fasta to stop issue w/connecting to aws and igenomes not used
+    for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
+
+    // Check mandatory parameters
+
+    //input on command line
+    if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry PHOENIX: Input samplesheet not specified!' }
+    ch_versions = Channel.empty() // Used to collect the software versions
+
+    main:
+        PHOENIX_EXTERNAL_SLIM ( ch_input, ch_versions, true )
+    emit:
+        scaffolds        = PHOENIX_EXTERNAL.out.scaffolds
+        trimmed_reads    = PHOENIX_EXTERNAL.out.trimmed_reads
+        mlst             = PHOENIX_EXTERNAL.out.mlst
+        amrfinder_output = PHOENIX_EXTERNAL.out.amrfinder_output
+        gamma_ar         = PHOENIX_EXTERNAL.out.gamma_ar
+        phx_summary      = PHOENIX_EXTERNAL.out.phx_summary
+}
+
+//
+// WORKFLOW: Run internal version of cdcgov/phoenix analysis pipeline that includes BUSCO, SRST2 and KRAKEN_ASMBLED
+//
+
 workflow CDC_PHOENIX {
     // Validate input parameters
     // Check input path parameters to see if they exist
