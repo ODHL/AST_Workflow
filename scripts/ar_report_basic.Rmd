@@ -410,7 +410,7 @@ if(exists('treepath')){
   p2=ggplot(d1, aes(x =specimen_id, y = bar, fill = specimen_id)) +  
     geom_bar(stat = "identity") +
     geom_text( aes(label = species),
-               colour = "white", size = 2.5,hjust = 1.5)+
+               colour = "white", size = 2,hjust = 1.5)+
     coord_flip() +
     theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
@@ -422,7 +422,7 @@ if(exists('treepath')){
   
 
   #library(ggpubr)
-  ggarrange(ggtree_plot,p2, widths = c(1, .4))
+  ggarrange(ggtree_plot,p2, widths = c(1, .6))
 }
 ```
 

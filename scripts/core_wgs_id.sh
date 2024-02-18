@@ -4,8 +4,7 @@
 #########################################################
 output_dir=$1
 project_id=$2
-pipeline_results=$3
-wgs_results=$4
+wgs_results=$3
 
 flag_ids="Y"
 
@@ -14,9 +13,14 @@ flag_ids="Y"
 #########################################################
 wgs_dir="/home/ubuntu/workflows/AR_Workflow/wgs_db"
 
+pipeline_results=$output_dir/analysis/intermed/pipeline_results_clean.tsv
+
+##########################################################
+# Run code
+#########################################################
+
 # read in final report; create sample list
-cat $pipeline_results | awk '{print $1}' > $output_dir/intermed/tmp_sampleids.txt
-IFS=$'\n' read -d '' -r -a sample_list < $output_dir/intermed/tmp_sampleids.txt
+IFS=$'\n' read -d '' -r -a sample_list < $output_dir/logs/manifests/sample_ids.txt
 
 if [[ $flag_ids == "Y" ]]; then
     # create cache of local
@@ -55,7 +59,7 @@ if [[ $flag_ids == "Y" ]]; then
                     if [[ $first_grab == "Y" ]]; then
                         echo "--pulling ID from cache"
                         sed -i '/^$/d' $cached_db
-                        last_saved_id=`tail -n1 $cached_db | awk -F";" '{print $1}' | cut -f2 -d"-"`
+                        last_saved_id=`tail -n1 $cached_db | awk -F"," '{print $1}' | cut -f2 -d"-"`
                         echo "last saved: $last_saved_id"
                         stripped_id=`echo "${last_saved_id#"${last_saved_id%%[!0]*}"}"`
                         echo "stripped $stripped_id"

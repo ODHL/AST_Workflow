@@ -92,11 +92,6 @@ wgsID_script=$config_wgsID_script
 project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
 
 #read in text file with all project id's
-IFS=$'\n' read -d '' -r -a sample_list < config/sample_ids.txt
-if [[ -f $sample_id_file ]];then rm $sample_id_file; fi
-for f in ${sample_list[@]}; do
-	if [[ $f != "specimen_id" ]]; then 	echo $f-$project_name >> $sample_id_file; fi
-done
 IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file	
 
 # create proj tmp dir to enable multiple projects to be run simultaneously
@@ -107,6 +102,14 @@ if [[ $resume == "Y" ]]; then
 	analysis_cmd=`echo $config_analysis_cmd -resume`
 else
 	analysis_cmd=`echo $config_analysis_cmd`
+fi
+
+# set projectID
+# check that access to the projectID is available before attempting to download
+if [ -z "$project_number" ]; then
+	echo "The project id was not found from $project_name_full. Review available project names below and try again"
+	$config_basespace_cmd list projects --filter-term="${project_name_full}"
+	project_number="123456789"
 fi
 #############################################################################################
 # LOG INFO TO CONFIG
@@ -136,7 +139,7 @@ if [[ $flag_batch == "Y" ]]; then
 	IFS=$'\n' read -d '' -r -a raw_list < config/sample_ids.txt
 	if [[ -f $sample_id_file ]];then rm $sample_id_file; fi
 	for f in ${raw_list[@]}; do
-		if [[ $f != "specimen_id" ]]; then 	echo $f-$project_name >> $sample_id_file; fi
+		if [[ $f != "specimen_id" ]]; then 	echo $f >> $sample_id_file; fi
 	done
 	IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
 
@@ -225,13 +228,7 @@ fi
 batch_count=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
 batch_min=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
 if [[ $flag_download == "Y" ]]; then
-	# check that access to the projectID is available before attempting to download
-	if [ -z "$project_number" ]; then
-		echo "The project id was not found from $project_name_full. Review available project names below and try again"
-		$config_basespace_cmd list projects --filter-term="${project_name_full}"
-		exit
-	fi
-
+	
 	# output start message
 	message_cmd_log "--Downloading analysis files (this may take a few minutes to begin)"
 	message_cmd_log "---Starting time: `date`"
@@ -252,6 +249,8 @@ if [[ $flag_download == "Y" ]]; then
 		IFS=$'\n' read -d '' -r -a batch_list < $batch_manifest
 
 		for sample_id in ${batch_list[@]}; do
+			echo "$batch_manifest"
+			echo "$sample_id"
 			$config_basespace_cmd download biosample --quiet -n "${sample_id}" -o $tmp_batch_dir
 		done
 
@@ -290,6 +289,7 @@ if [[ $flag_analysis == "Y" ]]; then
 
 		# move to project dir
 		cd $pipeline_batch_dir/$project_number
+		if [[ ! -d $pipeline_batch_dir/$project_number ]]; then mkdir -p $pipeline_batch_dir/$project_number; fi
 
 		# set command
 		pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --kraken2db $config_kraken2_db --outdir $pipeline_batch_dir --projectID $project_name_full"
@@ -376,22 +376,24 @@ if [[ $flag_post == "Y" ]]; then
 
 	# read in all samples
 	for id in "${sample_list[@]}"; do
-		
+		echo "--$id"
 		# pull the needed variables
 		SID=$(awk -F";" -v sid=$id '{ if ($1 == sid) print NR }' $tmp_file)
-		Auto_QC_Outcome=`cat $tmp_file | awk -F";" -v i=$SID 'FNR == i {print $2}'`
 		Estimated_Coverage=`cat $tmp_file | awk -F";" -v i=$SID 'FNR == i {print $4}' | cut -f1 -d"."`
+
+		# clear old coverage
+		sed -i "s/coverage_below_30(0)//g" $tmp_file
 
 		# check if the failure is real
 		cov_replace="coverage_below_30($Estimated_Coverage)"
 		if [[ $Estimated_Coverage -gt 29 ]]; then
-			awk -F";" -v i=$SID 'BEGIN {OFS = FS} NR==i {$2="PASS"}1' $tmp_file >> $pipeline_results_clean
+			awk -F";" -v i=$SID 'BEGIN {OFS = FS} NR==i {$2="PASS"}1' $tmp_file > $pipeline_results_clean
 		else
-			awk -F";" -v i=$SID -v cov=$cov_replace 'BEGIN {OFS = FS} NR==i {$24=cov}1' $tmp_file >> $pipeline_results_clean
+			awk -F";" -v i=$SID -v cov=$cov_replace 'BEGIN {OFS = FS} NR==i {$24=cov}1' $tmp_file > $pipeline_results_clean
 		fi
-		
-		# clean up coverage
-		sed -i "s/coverage_below_30(0)//g" $pipeline_results_clean
+
+		# save changes
+		cp $pipeline_results_clean $tmp_file
     done
 
 	# cleanup

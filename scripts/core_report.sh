@@ -29,7 +29,6 @@ fastqc_dir=$analysis_dir/qc/data
 qcreport_dir=$analysis_dir/qc
 multiqc_log=$log_dir/pipeline_log.txt
 merged_amr=$intermed_dir/ar_all_genes.tsv
-samplesheet=$log_dir/manifests/samplesheet_gff.csv	
 sample_ids=$output_dir/logs/manifests/sample_ids.txt
 
 ##########################################################
@@ -57,16 +56,18 @@ else
     exit
 fi
 
+##########################################################
+# Run analysis
+#########################################################
 if [[ $flag_basic == "Y" ]]; then
+    echo "--creating basic report"
     # read in final report; create sample list
     IFS=$'\n' read -d '' -r -a sample_list < $sample_ids
     
     # set file
     chunk1="specimen_id,wgs_id,srr_id,wgs_date_put_on_sequencer,sequence_classification,run_id"
-    # chunk2="auto_qc_outcome,estimated_coverage,genome_length,assembly_ratio_(stdev),species,mlst_scheme_1"
     chunk2="auto_qc_outcome,estimated_coverage,genome_length,species,mlst_scheme_1"
     chunk3="mlst_1,mlst_scheme_2,mlst_2,gamma_beta_lactam_resistance_genes"
-    # chunk3="mlst_1,mlst_scheme_2,mlst_2,gamma_beta_lactam_resistance_genes,hypervirulence"
     chunk4="auto_qc_failure_reason"
     echo -e "${chunk1},${chunk2},${chunk3},${chunk4}" > $final_results 
     
@@ -74,7 +75,6 @@ if [[ $flag_basic == "Y" ]]; then
     for id in "${sample_list[@]}"; do
         # set id
         specimen_id=$id
-        echo $specimen_id
         
         # check WGS ID, if available
         if [[ -f $wgs_results ]]; then 
@@ -95,14 +95,12 @@ if [[ $flag_basic == "Y" ]]; then
         run_id=$project_id
         
         # determine row 
-        cat $pipeline_results | grep "$specimen_id" | awk -F";" '{print $1}'
         SID=$(awk -F";" -v sid=$specimen_id '{ if ($1 == sid) print NR }' $pipeline_results)
 
         # pull metadata
         Auto_QC_Outcome=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $2}'`
         Estimated_Coverage=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $4}'`
         Genome_Length=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $5}'`
-        # Assembly_Ratio=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $6}'`
         Auto_QC_Failure_Reason=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $24}'`
         
         # set taxonomy
@@ -115,13 +113,10 @@ if [[ $flag_basic == "Y" ]]; then
         
         # set genes
         GAMMA_Beta_Lactam_Resistance_Genes=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $19}'`
-        # Hypervirulence_Genes=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $22}'`
         
         # prepare chunks
         chunk1="$specimen_id,$wgs_id,$srr_number,$wgs_date_put_on_sequencer,\"${sequence_classification}\",$run_id"
-        # chunk2="$Auto_QC_Outcome,$Estimated_Coverage,$Genome_Length,$Assembly_Ratio,"${Species}",$MLST_Scheme_1"
         chunk2="$Auto_QC_Outcome,$Estimated_Coverage,$Genome_Length,"${Species}",$MLST_Scheme_1"
-        # chunk3="\"${MLST_1}\",$MLST_Scheme_2,\"${MLST_2}\",\"${GAMMA_Beta_Lactam_Resistance_Genes}\",\"${Hypervirulence_Genes}\""
         chunk3="\"${MLST_1}\",$MLST_Scheme_2,\"${MLST_2}\",\"${GAMMA_Beta_Lactam_Resistance_Genes}\""
         chunk4="\"${Auto_QC_Failure_Reason}\""
         echo -e "${chunk1},${chunk2},${chunk3},${chunk4}" >> $final_results
@@ -179,8 +174,7 @@ if [[ $flag_basic == "Y" ]]; then
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
 		batch_dir="$ncbi_dir/batch_0$batch_id"
         cd $ncbi_dir
-        tar -zcvf batch_0$batch_id.tar.gz $batch_dir/
-        
+        if [[ ! -f batch_0$batch_id.tar.gz ]]; then tar -zcvf batch_0$batch_id.tar.gz $batch_dir/; fi
         #rm -rf $batch_dir
         
         # undo 
@@ -189,16 +183,20 @@ if [[ $flag_basic == "Y" ]]; then
 
     # run multiQC
 	## -d -dd 1 adds dir name to sample name
-	multiqc -f -v \
-	-c $multiqc_config \
-	$fastqc_dir \
-	-o $qcreport_dir 2>&1 | tee -a $multiqc_log
+	if [[ ! -f $qcreport_dir/multiqc_report.html ]]; then
+        multiqc -f -v \
+        -c $multiqc_config \
+        $fastqc_dir \
+        -o $qcreport_dir 2>&1 | tee -a $multiqc_log
+    fi
 
-    if [[ -f $qcreport_dir/multiqc_report.html ]]; then
+    if [[ -f $qcreport_dir/multiqc_report.html ]] && [[ ! -f $fastqc_dir.tar.gz ]]; then
         cp $qcreport_dir/multiqc_report.html $report_dir
         tar -zcvf $fastqc_dir.tar.gz $fastqc_dir/
         rm -rf $fastqc_dir
     fi
+
+    head $final_results
 fi
 
 if [[ $flag_outbreak == "Y" ]]; then

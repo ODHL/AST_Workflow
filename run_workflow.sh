@@ -98,7 +98,7 @@ ar_dir=$output_dir/ar
 
 # set files
 ## results of pipeline
-pipeline_results=$analysis_dir/intermed/pipeline_results.tsv
+pipeline_results=$analysis_dir/intermed/pipeline_results_clean.tsv
 wgs_results=$analysis_dir/intermed/pipeline_results_wgs.tsv
 ncbi_results=$analysis_dir/intermed/pipeline_results_ncbis.csv
 
@@ -128,12 +128,12 @@ if [[ $pipeline == "phase1" ]]; then
         bash run_workflow.sh -p wgs -n $project_id
 
         # prep for NCBI
-        bash run_workflow.sh -p ncbi_upload -n $project_id
+        bash run_workflow.sh -p ncbi -n $project_id -s UPLOAD
 
 elif [[ $pipeline == "phase2" ]]; then
         
         # merge NCBI output
-        bash run_workflow.sh -p ncbi_download -n $project_id
+        bash run_workflow.sh -p ncbi -n $project_id -s POST
 
         # create basic report
         bash run_workflow.sh -p report -n $project_id -s BASIC
@@ -241,19 +241,21 @@ elif [[ "$pipeline" == "tree" ]]; then
 ################################## Run ID
 elif [[ "$pipeline" == "wgs" ]]; then
         bash scripts/core_wgs_id.sh \
-                $analysis_dir \
+                $output_dir \
                 $project_name \
-                $pipeline_results \
                 $wgs_results
 ################################## Run NCBI
-elif [[ "$pipeline" == "ncbi_upload" ]]; then        
+elif [[ "$pipeline" == "ncbi" ]]; then        
         bash scripts/core_ncbi.sh \
-        $output_dir $project_name $pipeline_config $pipeline_results $wgs_results $ncbi_results "UPLOAD"
-elif [[ "$pipeline" == "ncbi_download" ]]; then        
-        bash scripts/core_ncbi.sh \
-        $output_dir $project_name $pipeline_config $pipeline_results $wgs_results $ncbi_results "DOWNLOAD"
+        $output_dir \
+        $project_name \
+        $pipeline_config \
+        $wgs_results \
+        $ncbi_results \
+        $subworkflow
 ################################## Run reporting
 elif [[ "$pipeline" == "report" ]]; then
+        bash scripts/core_report.sh \
                 $output_dir \
                 $project_name \
                 $pipeline_results \

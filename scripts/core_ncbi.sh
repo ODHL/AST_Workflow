@@ -4,10 +4,9 @@
 output_dir=$1
 project_id=$2
 pipeline_config=$3
-pipeline_results=$4
-wgs_results=$5
-ncbi_results=$6
-subworkflow=$7
+wgs_results=$4
+ncbi_results=$5
+subworkflow=$6
 
 #########################################################
 # Eval, source
@@ -23,16 +22,16 @@ date_stamp=`date '+%Y_%m_%d'`
 
 # set dirs
 fasta_dir=$output_dir/analysis/fasta
-log_dir=$output_dir/logs/ncbi
+log_dir=$output_dir/logs
 ncbi_dir=$output_dir/ncbi
 metadataFILE=${config_metadata_file}
-tmp_dir=$ncbi_dir/data
 
 # set files
 if [[ -d $log_dir ]]; then mkdir -p $log_dir; fi
 ncbi_hold="../ncbi_hold/$project_id"
 ncbi_output=$ncbi_hold/complete/*ok.tsv
 ncbi_failed=$ncbi_hold/complete/NCBI_failed.txt
+pipeline_results=$output_dir/analysis/intermed/pipeline_results_clean.tsv
 
 # set basespace command
 basespace_command=${config_basespace_cmd}
@@ -45,32 +44,39 @@ flag_batch="N"
 flag_manifests="N"
 flag_fastqs="N"
 flag_check="N"
-flag_download="N"
-if [[ $subworkflow == "UPLOAD" ]]; then
+flag_post="N"
+if [[ $subworkflow == "BATCH" ]]; then
+	flag_batch="Y"
+elif [[ $subworkflow == "PREP" ]]; then
+	flag_manifests="Y"
+elif [[ $subworkflow == "FASTQ" ]]; then
+	flag_fastqs="Y"
+elif [[ $subworkflow == "PRECHECK" ]]; then
+	flag_precheck="Y"
+elif [[ $subworkflow == "UPLOAD" ]]; then
 	flag_batch="Y"
 	flag_manifests="Y"
 	flag_fastqs="Y"
-	flag_check="Y"
-
-	# check the metadata file is available before processing
-	if [[ ! -f $metadataFILE ]]; then echo "METADATA FILE IS MISSING: $metadataFILE"; exit; fi
-elif [[ $subworkflow == "DOWNLOAD" ]]; then
-	flag_download="Y"
+	flag_precheck="Y"
+elif [[ $subworkflow == "POST" ]]; then
+	flag_post="Y"
 fi
+
+# check the metadata file is available before processing
+if [[ ! -f $metadataFILE ]]; then echo "METADATA FILE IS MISSING: $metadataFILE"; exit; fi
 
 #########################################################
 # Code
 #########################################################
-if [[ "$flag_batch" == "Y" ]]; then
+if [[ $flag_batch == "Y" ]]; then
     echo "----PREPARING BATCHES"
 	
 	# cleanup
-	if [[ -d $ncbi_dir/batch* ]]; then rm -r $ncbi_dir/batch*; fi
 	if [[ -f $ncbi_dir/passed_list.txt ]]; then rm $ncbi_dir/passed_list.txt; fi
 	
 	# pull samples that have passed QC, have WGS-IDs
 	passed_samples="$ncbi_dir/passed_list.txt"
-	cat $pipeline_results | grep "PASS" | awk '{print $1}' > $passed_samples
+	cat $pipeline_results | grep "PASS" | awk -F";" '{print $1}' > $passed_samples
 
 	# split into chunks of 50
 	split $passed_samples $ncbi_dir/manifest_batch_ --numeric=1 -l 50 --numeric-suffixes --additional-suffix=.txt
@@ -86,7 +92,7 @@ if [[ "$flag_batch" == "Y" ]]; then
 	done
 fi
 
-if [[ "$flag_manifests" == "Y" ]]; then
+if [[ $flag_manifests == "Y" ]]; then
     echo "----PREPARING MANIFESTS"
 	batch_count=`ls $ncbi_dir/*/manifest_batch_* | wc -l`
 	batch_min=1
@@ -116,8 +122,8 @@ if [[ "$flag_manifests" == "Y" ]]; then
 			# set variables from wgs_results
 			wgsID=`cat $wgs_results | grep $id | awk -F"," '{print $2}'`
 
-			SID=$(awk -v sid=$id '{ if ($1 == sid) print NR }' $pipeline_results)
-			organism=`cat $pipeline_results | awk -F"\t" -v i=$SID 'FNR == i {print $14}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
+			SID=$(awk -F";" -v sid=$id '{ if ($1 == sid) print NR }' $pipeline_results)
+			organism=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $14}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
 		
 			# grab metadata line
 			meta=`cat $metadataFILE | grep "$id"`
@@ -163,7 +169,7 @@ if [[ "$flag_manifests" == "Y" ]]; then
 	done
 fi
 
-if [[ "$flag_fastqs" == "Y" ]]; then
+if [[ $flag_fastqs == "Y" ]]; then
 	echo "----PREPARING FASTQS"
 	batch_count=`ls $ncbi_dir/*/manifest_batch_* | wc -l`
 	batch_min=1
@@ -171,12 +177,13 @@ if [[ "$flag_fastqs" == "Y" ]]; then
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
 		batch_dir="$ncbi_dir/batch_0$batch_id"
 		batch_manifest="$batch_dir/manifest_batch_0${batch_id}.txt"
+		fastq_dir=$output_dir/tmp/batch_0$batch_id/rawdata
 
 		# process samples
 		IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
 		for id in "${sample_list[@]}"; do
-			R1="$tmp_dir/$id*R1*"
-			R2="$tmp_dir/$id*R2*"
+			R1="$fastq_dir/$id*R1*"
+			R2="$fastq_dir/$id*R2*"
 
 			# check R1
 			if [[ $R1 ]]; then cp $R1 $batch_dir; else echo "MISSING FASTQ FILE: $R1"; fi
@@ -187,7 +194,7 @@ if [[ "$flag_fastqs" == "Y" ]]; then
 	done
 fi
 	
-if [[ "$flag_check" == "Y" ]]; then
+if [[ "$flag_precheck" == "Y" ]]; then
 	echo "----UPLOAD CHECK"
 	batch_count=`ls $ncbi_dir/*/manifest_batch_* | wc -l`
 	batch_min=1
@@ -213,11 +220,11 @@ if [[ "$flag_check" == "Y" ]]; then
 			if [[ $att == "" ]] || [[ $meta == "" ]]; then echo "----ATT/META Error"; fi
 		done
 	done
-	echo "----UPLOAD CHECK COMPLETE"
+	echo "-----READY FOR UPLOAD"
 fi
 
-if [[ "$flag_download" == "Y" ]]; then
-	echo "----MERGING DATA"
+if [[ "$flag_post" == "Y" ]]; then
+	echo "----post processing"
 	
 	# prep results file
 	if [[ -f $ncbi_results ]]; then rm $ncbi_results; fi
@@ -230,6 +237,7 @@ if [[ "$flag_download" == "Y" ]]; then
 		batch_dir="$ncbi_dir/batch_0$batch_id"
 		batch_manifest="$batch_dir/manifest_batch_0${batch_id}.txt"
 		ncbi_output=$batch_dir/*ok*
+		cp $ncbi_output $log_dir/manifests/pipeline
 		
 		# process samples
 		IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
@@ -243,4 +251,6 @@ if [[ "$flag_download" == "Y" ]]; then
 			echo "$wgsID,$sraID" >> $ncbi_results
 		done
 	done
+
+	head $ncbi_results
 fi
