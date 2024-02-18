@@ -1,5 +1,5 @@
 #!/bin/bash -l
-echo "YOOOOOOOOOOOOOOOOOOOOOOOOOOOO"
+
 #
 # Description: script to Compare local assembly to the expected assembly size based upon taxonomy file in directory or directly given
 #
@@ -155,6 +155,15 @@ if [[ ! "${force}" ]]; then
 			genus="No genus found"
 		fi
 		species=$(head -n8 "${tax_file}" | tail -n1 | cut -d'	' -f2)
+		# handling species with sp in the name.
+		if [[ $species == *sp.* ]]; then
+			# If yes, remove a space after "sp."
+			species="${species/sp. /sp.}"
+			#make sure the letters after sp. are in caps
+			species=$(echo "$species" | sed -E 's/(sp\.)([a-zA-Z]+)/\1\U\2/')
+			#change spaces to - to be inline with how the NCBI assembly stats file is made
+			species="${species// /-}"
+		fi
 		if [[ "${species}" = "" ]]; then
 			species="No species found"
 		fi
@@ -175,7 +184,9 @@ while IFS='' read -r line; do
 	IFS=$'\t' read -a arr_line <<< "$line"
 	#echo "${arr_line}"
 	#echo  "${genus} ${species} vs ${arr_line[0]}"
-	if [[ "${genus} ${species}" = "${arr_line[0]}" ]]; then
+	# convert all variables to all lowercase for a case agnostic search
+	if [[ "${genus,,} ${species,,}" = "${arr_line[0],,}" ]]; then
+		# if sp. is in the name then 
 		taxid="${arr_line[19]}"
 		if [ "${taxid}" = -2 ]; then
 			taxid="No mode available when determining tax id"
