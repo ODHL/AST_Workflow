@@ -9,7 +9,7 @@ process SPADES {
     path(fastp_raw_qc), \
     path(fastp_total_qc), \
     path(kraken2_trimd_report), \
-    path(krona_trimd), \
+    path(krona_trimd)
     val(extended_qc) // true is for -entry CDC_PHOENIX and CDC_SCAFFOLDS
 
     output:
