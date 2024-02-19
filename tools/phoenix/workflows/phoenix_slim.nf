@@ -15,6 +15,11 @@ def summary_params = NfcoreSchema.paramsSummaryMap(workflow, params)
 // Info required for completion email and summary
 def multiqc_report = []
 
+def create_empty_ch(input_for_meta) { // We need meta.id associated with the empty list which is why .ifempty([]) won't work
+    meta_id = input_for_meta[0]
+    output_array = [ meta_id, [] ]
+    return output_array
+}
 /*
 ========================================================================================
     CONFIG FILES
@@ -71,9 +76,9 @@ include { CREATE_NCBI_UPLOAD_SHEET       } from '../modules/local/create_ncbi_up
 include { INPUT_CHECK                    } from '../subworkflows/local/input_check'
 include { SPADES_WF                      } from '../subworkflows/odhl/spades_failure'
 include { GENERATE_PIPELINE_STATS_WF     } from '../subworkflows/local/generate_pipeline_stats'
-include { KRAKEN2_WF as KRAKEN2_TRIMD    } from '../subworkflows/local/kraken2krona'
-include { KRAKEN2_WF as KRAKEN2_ASMBLD   } from '../subworkflows/local/kraken2krona'
-include { KRAKEN2_WF as KRAKEN2_WTASMBLD } from '../subworkflows/local/kraken2krona'
+include { KRAKEN2_WF as KRAKEN2_TRIMD    } from '../subworkflows/odhl/kraken2krona'
+include { KRAKEN2_WF as KRAKEN2_ASMBLD   } from '../subworkflows/odhl/kraken2krona'
+include { KRAKEN2_WF as KRAKEN2_WTASMBLD } from '../subworkflows/odhl/kraken2krona'
 include { DO_MLST                        } from '../subworkflows/local/do_mlst'
 
 /*
@@ -351,6 +356,10 @@ workflow PHOENIX_EXTERNAL_SLIM {
         )
         ch_versions = ch_versions.mix(CALCULATE_ASSEMBLY_RATIO.out.versions)
 
+        // Creating empty channel that has the form [ meta.id, [] ] that can be passed as a blank below
+        // Groovy funtion to make [ meta.id, [] ] - just an empty channel
+        empty_ch = RENAME_FASTA_HEADERS.out.renamed_scaffolds.map{ it -> create_empty_ch(it) }
+
         GENERATE_PIPELINE_STATS_WF (
             GET_RAW_STATS.out.combined_raw_stats, \
             GET_TRIMD_STATS.out.fastp_total_qc, \
@@ -361,9 +370,9 @@ workflow PHOENIX_EXTERNAL_SLIM {
             RENAME_FASTA_HEADERS.out.renamed_scaffolds, \
             BBMAP_REFORMAT.out.filtered_scaffolds, \
             DO_MLST.out.checked_MLSTs, \
-            GAMMA_HV.out.gamma, \
+            empty_ch, \
             GAMMA_AR.out.gamma, \
-            GAMMA_PF.out.gamma, \
+            empty_ch, \
             QUAST.out.report_tsv, \
             [], [], [], [], \
             KRAKEN2_WTASMBLD.out.report, \
@@ -378,16 +387,13 @@ workflow PHOENIX_EXTERNAL_SLIM {
         )
         ch_versions = ch_versions.mix(GENERATE_PIPELINE_STATS_WF.out.versions)
 
-        // Creating empty channel that has the form [ meta.id, [] ] that can be passed as a blank below
-        empty_ch = RENAME_FASTA_HEADERS.out.renamed_scaffolds.map{ it -> create_empty_ch(it) }
-
 
         // Combining output based on meta.id to create summary by sample -- is this verbose, ugly and annoying? yes, if anyone has a slicker way to do this we welcome the input.
         line_summary_ch = GET_TRIMD_STATS.out.fastp_total_qc.map{meta, fastp_total_qc  -> [[id:meta.id], fastp_total_qc]}\
         .join(DO_MLST.out.checked_MLSTs.map{                             meta, checked_MLSTs   -> [[id:meta.id], checked_MLSTs]},   by: [0])\
-        .join(empty_ch.map{                                      meta, list            -> [[id:meta.id], list]},            by: [0])\
+        .join(empty_ch.map{                                              meta, gamma           -> [[id:meta.id], gamma]},           by: [0])\
         .join(GAMMA_AR.out.gamma.map{                                    meta, gamma           -> [[id:meta.id], gamma]},           by: [0])\
-        .join(empty_ch.map{                                      meta, list            -> [[id:meta.id], list]},            by: [0])\
+        .join(empty_ch.map{                                              meta, gamma           -> [[id:meta.id], gamma]},           by: [0])\
         .join(QUAST.out.report_tsv.map{                                  meta, report_tsv      -> [[id:meta.id], report_tsv]},      by: [0])\
         .join(CALCULATE_ASSEMBLY_RATIO.out.ratio.map{                    meta, ratio           -> [[id:meta.id], ratio]},           by: [0])\
         .join(GENERATE_PIPELINE_STATS_WF.out.pipeline_stats.map{         meta, pipeline_stats  -> [[id:meta.id], pipeline_stats]},  by: [0])\
@@ -421,7 +427,7 @@ workflow PHOENIX_EXTERNAL_SLIM {
         .combine(SCAFFOLD_COUNT_CHECK.out.summary_line.collect().ifEmpty( [] ))\
         .ifEmpty( [] )
 
-        // pulling it all together
+        // // pulling it all together
         all_summaries_ch = spades_failure_summaries_ch.combine(failed_summaries_ch).combine(summaries_ch).combine(fairy_summary_ch)
 
         // Combining sample summaries into final report
@@ -430,33 +436,33 @@ workflow PHOENIX_EXTERNAL_SLIM {
         )
         ch_versions = ch_versions.mix(GATHER_SUMMARY_LINES.out.versions)
 
-        //create GRiPHin report
-        GRIPHIN (
-            all_summaries_ch, INPUT_CHECK.out.valid_samplesheet, params.ardb, outdir_path, params.coverage, true, false
-        )
-        ch_versions = ch_versions.mix(GRIPHIN.out.versions)
+        // //create GRiPHin report
+        // GRIPHIN (
+        //     all_summaries_ch, INPUT_CHECK.out.valid_samplesheet, params.ardb, outdir_path, params.coverage, true, false
+        // )
+        // ch_versions = ch_versions.mix(GRIPHIN.out.versions)
 
-        if (ncbi_excel_creation == true && params.create_ncbi_sheet == true) {
-            // requiring files so that this process doesn't start until needed files are made. 
-            required_files_ch = FASTP_TRIMD.out.reads.map{ meta, reads -> reads[0]}.collect().combine(DO_MLST.out.checked_MLSTs.map{ meta, checked_MLSTs -> checked_MLSTs}.collect()).combine(DETERMINE_TAXA_ID.out.taxonomy.map{ meta, taxonomy -> taxonomy}.collect())
+        // if (ncbi_excel_creation == true && params.create_ncbi_sheet == true) {
+        //     // requiring files so that this process doesn't start until needed files are made. 
+        //     required_files_ch = FASTP_TRIMD.out.reads.map{ meta, reads -> reads[0]}.collect().combine(DO_MLST.out.checked_MLSTs.map{ meta, checked_MLSTs -> checked_MLSTs}.collect()).combine(DETERMINE_TAXA_ID.out.taxonomy.map{ meta, taxonomy -> taxonomy}.collect())
 
-            //Fill out NCBI excel sheets for upload based on what PHX found
-            CREATE_NCBI_UPLOAD_SHEET (
-                required_files_ch, params.microbe_example, params.sra_metadata, params.osii_bioprojects, outdir_path, GRIPHIN.out.griphin_tsv_report
-            )
-            ch_versions = ch_versions.mix(CREATE_NCBI_UPLOAD_SHEET.out.versions)
-        }
+        //     //Fill out NCBI excel sheets for upload based on what PHX found
+        //     CREATE_NCBI_UPLOAD_SHEET (
+        //         required_files_ch, params.microbe_example, params.sra_metadata, params.osii_bioprojects, outdir_path, GRIPHIN.out.griphin_tsv_report
+        //     )
+        //     ch_versions = ch_versions.mix(CREATE_NCBI_UPLOAD_SHEET.out.versions)
+        // }
 
-        // Collecting the software versions
-        CUSTOM_DUMPSOFTWAREVERSIONS (
-            ch_versions.unique().collectFile(name: 'collated_versions.yml')
-        )
+        // // Collecting the software versions
+        // CUSTOM_DUMPSOFTWAREVERSIONS (
+        //     ch_versions.unique().collectFile(name: 'collated_versions.yml')
+        // )
 
         //
         // MODULE: MultiQC
         //
-        workflow_summary    = WorkflowPhoenix.paramsSummaryMultiqc(workflow, summary_params)
-        ch_workflow_summary = Channel.value(workflow_summary)
+        // workflow_summary    = WorkflowPhoenix.paramsSummaryMultiqc(workflow, summary_params)
+        // ch_workflow_summary = Channel.value(workflow_summary)
 
         // ch_multiqc_files = Channel.empty()
         // ch_multiqc_files = ch_multiqc_files.mix(Channel.from(ch_multiqc_config))
@@ -483,8 +489,8 @@ workflow PHOENIX_EXTERNAL_SLIM {
         mlst             = DO_MLST.out.checked_MLSTs
         amrfinder_output = AMRFINDERPLUS_RUN.out.report
         gamma_ar         = GAMMA_AR.out.gamma
-        phx_summary     = GATHER_SUMMARY_LINES.out.summary_report
-}
+        phx_summary      = GATHER_SUMMARY_LINES.out.summary_report
+    }
 
 /*
 ========================================================================================
