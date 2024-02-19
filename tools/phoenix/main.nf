@@ -90,12 +90,12 @@ workflow PHOENIX_SLIM {
     main:
         PHOENIX_EXTERNAL_SLIM ( ch_input, ch_versions, true )
     emit:
-        scaffolds        = PHOENIX_EXTERNAL.out.scaffolds
-        trimmed_reads    = PHOENIX_EXTERNAL.out.trimmed_reads
-        mlst             = PHOENIX_EXTERNAL.out.mlst
-        amrfinder_output = PHOENIX_EXTERNAL.out.amrfinder_output
-        gamma_ar         = PHOENIX_EXTERNAL.out.gamma_ar
-        phx_summary      = PHOENIX_EXTERNAL.out.phx_summary
+        scaffolds        = PHOENIX_EXTERNAL_SLIM.out.scaffolds
+        trimmed_reads    = PHOENIX_EXTERNAL_SLIM.out.trimmed_reads
+        mlst             = PHOENIX_EXTERNAL_SLIM.out.mlst
+        amrfinder_output = PHOENIX_EXTERNAL_SLIM.out.amrfinder_output
+        gamma_ar         = PHOENIX_EXTERNAL_SLIM.out.gamma_ar
+        phx_summary      = PHOENIX_EXTERNAL_SLIM.out.phx_summary
 }
 
 //
