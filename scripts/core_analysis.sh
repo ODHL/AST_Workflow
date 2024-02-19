@@ -288,8 +288,8 @@ if [[ $flag_analysis == "Y" ]]; then
 		samplesheet=$log_dir/manifests/samplesheet_$batch_name.csv
 
 		# move to project dir
-		cd $pipeline_batch_dir/$project_number
 		if [[ ! -d $pipeline_batch_dir/$project_number ]]; then mkdir -p $pipeline_batch_dir/$project_number; fi
+		cd $pipeline_batch_dir/$project_number
 
 		# set command
 		pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --kraken2db $config_kraken2_db --outdir $pipeline_batch_dir --projectID $project_name_full"
