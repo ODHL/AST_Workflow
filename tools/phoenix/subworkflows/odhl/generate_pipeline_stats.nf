@@ -54,6 +54,13 @@ workflow GENERATE_PIPELINE_STATS_WF {
             trimd_k2_bh_summary = wtasmbld_report.map{ it -> create_empty_ch(it) }
         }
 
+        // set empty channels for slim workflow
+        trimd_krona_html = wtasmbld_report.map{ it -> create_empty_ch(it) }
+        gamma_hv = wtasmbld_report.map{ it -> create_empty_ch(it) }
+        gamma_pf = wtasmbld_report.map{ it -> create_empty_ch(it) }
+        asmbld_krona_html = wtasmbld_report.map{ it -> create_empty_ch(it) }
+        wtasmbld_krona_html = wtasmbld_report.map{ it -> create_empty_ch(it) }
+
         if (extended_qc == true) {
             // Combining output based on id:meta.id to create pipeline stats file by sample -- is this verbose, ugly and annoying. yes, if anyone has a slicker way to do this we welcome the input. 
             pipeline_stats_ch = fastp_raw_qc.map{ meta, fastp_raw_qc           -> [[id:meta.id],fastp_raw_qc]}\
