@@ -109,7 +109,7 @@ if [[ $flag_basic == "Y" ]]; then
         MLST_1=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $16}'`
         MLST_Scheme_2=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $17}'`
         MLST_2=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $18}'`
-        sequence_classification=`echo "MLST<$MLST_1><$MLST_Scheme_1><$Species>"`
+        sequence_classification=`echo "MLST_${MLST_1}_${MLST_Scheme_1}_${Species}"`
         
         # set genes
         GAMMA_Beta_Lactam_Resistance_Genes=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $19}'`
