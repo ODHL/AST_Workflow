@@ -1,5 +1,6 @@
 # params
 batch_limit: 15
+kraken2_contamination_threshold: 20
 
 # tools
 basespace_cmd: "/home/ubuntu/tools/basespace"

@@ -88,17 +88,17 @@ else
 	sorted_ani=${ani_file//.txt/.sorted.txt}
 
 	#create %COV column
-	cat $sorted_ani | grep -v "Scaffold" | awk -F"\t" '{ print $0, $4 / $5 * 100 }' > cov.txt
+	cat $ani_file | grep -v "Scaffold" | awk -F"\t" '{ print $0, $4 / $5 * 100 }' > cov.txt
 
 	# create third weighted column that considerings both
 	# ID and COVERAGE in ranking
 	awk '{ print $0, $3 * $6 / 100 }' cov.txt > weighted.txt
 
 	# sort by the weighted ranking column
-	sort -k7 -n -r weighted.txt > final.txt
+	sort -k7 -n -r weighted.txt > "${sorted_ani}"
 
 	# define new best col
-	best=$(head -n 1 final.txt)
+	best=$(head -n 1 "${sorted_ani}")
 
 	#Creates an array from the best hit
 	IFS='	' read -r -a def_array <<< "${best}"
@@ -108,10 +108,11 @@ else
 	fragment_matches=${def_array[3]}
 	total_fragments=${def_array[4]}
 	best_percent=$(echo "scale=2; $best_percent / 1" | $bc_path -l)
-	best_coverage=$(echo "scale=2; 100 * $fragment_matches / $total_fragments" | $bc_path -l)
-
+	best_coverage=`echo $best | awk '{print $6}'`
+	
 	# Pulling taxonomy from filename which was looked up. Can possibly be out of date. REFSEQ file will ALWAYS be current though
 	best_genus=$(echo "${best_file}" | cut -d'_' -f1)
+	
 	# handling for if uncultured is in the organism genome file name
 	if [[ "${best_genus}" == "Uncultured" ]]; then
 		best_genus=$(echo "${best_file}" | cut -d'_' -f2)
@@ -124,10 +125,6 @@ else
 	#Creates a line at the top of the file to show the best match in an easily readable format that matches the style on the MMB_Seq log
 	echo -e "% ID	% Coverage	Organism	Source File" > "${sample_name}_${db_name}.fastANI.txt"
 	echo -e "${best_percent}	${best_coverage}	${best_organism_guess}	${best_file}" >> "${sample_name}_${db_name}.fastANI.txt"
-
-	### Add headers to file for Splunk integration
-	# sed 1i 'Isolate_Assembly_File	RefSEQ_Assembly_File	ANI_value	Mtaching_fragments	Total_fragments' "${sorted_ani}"
-
 
 	end_time=$(date "+%m-%d-%Y_at_%Hh_%Mm_%Ss")
 	echo "ENDed ANI at ${end_time}"

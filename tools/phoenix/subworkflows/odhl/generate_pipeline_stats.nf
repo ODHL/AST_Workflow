@@ -2,7 +2,7 @@
 // Subworkflow: Running SPAdes and checking if spades failed to create scaffolds
 //
 
-include { GENERATE_PIPELINE_STATS      } from '../../modules/local/generate_pipeline_stats'
+include { GENERATE_PIPELINE_STATS      } from '../../modules/odhl/generate_pipeline_stats'
 include { GENERATE_PIPELINE_STATS_EXQC } from '../../modules/local/generate_pipeline_stats_exqc'
 
 // Groovy funtion to make [ meta.id, [] ] - just an empty channel
@@ -53,13 +53,6 @@ workflow GENERATE_PIPELINE_STATS_WF {
             trimd_krona_html = wtasmbld_report.map{ it -> create_empty_ch(it) }
             trimd_k2_bh_summary = wtasmbld_report.map{ it -> create_empty_ch(it) }
         }
-
-        // set empty channels for slim workflow
-        trimd_krona_html = wtasmbld_report.map{ it -> create_empty_ch(it) }
-        gamma_hv = wtasmbld_report.map{ it -> create_empty_ch(it) }
-        gamma_pf = wtasmbld_report.map{ it -> create_empty_ch(it) }
-        asmbld_krona_html = wtasmbld_report.map{ it -> create_empty_ch(it) }
-        wtasmbld_krona_html = wtasmbld_report.map{ it -> create_empty_ch(it) }
 
         if (extended_qc == true) {
             // Combining output based on id:meta.id to create pipeline stats file by sample -- is this verbose, ugly and annoying. yes, if anyone has a slicker way to do this we welcome the input. 

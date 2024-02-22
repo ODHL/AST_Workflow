@@ -72,7 +72,6 @@ check_initialization(){
 
 # source global functions
 source $(dirname "$0")/scripts/core_functions.sh
-
 #############################################################################################
 # args
 #############################################################################################
@@ -94,11 +93,10 @@ output_dir="/home/ubuntu/output/$project_name"
 log_dir=$output_dir/logs
 tmp_dir=$output_dir/tmp
 analysis_dir=$output_dir/analysis
-ar_dir=$output_dir/ar
 
 # set files
 ## results of pipeline
-pipeline_results=$analysis_dir/intermed/pipeline_results_clean.tsv
+pipeline_results=$analysis_dir/intermed/pipeline_results_ar.tsv
 wgs_results=$analysis_dir/intermed/pipeline_results_wgs.tsv
 ncbi_results=$analysis_dir/intermed/pipeline_results_ncbis.csv
 
@@ -106,8 +104,6 @@ final_results=$analysis_dir/reports/final_results_$today_date.csv
 pipeline_log=$log_dir/pipeline_log.txt
 multiqc_config="$log_dir/config/config_multiqc.yaml"
 pipeline_config="$log_dir/config/config_pipeline.yaml"
-ar_config="$log_dir/config/config_ar.config"
-
 #############################################################################################
 #############################################################################################
 ######################### Run full workflows #########################
@@ -175,7 +171,7 @@ elif [[ "$pipeline" == "phaseM" ]]; then
 ################################## Run init
 elif [[ "$pipeline" == "init" ]]; then
         # parent
-        dir_list=(logs pipeline tmp analysis ncbi/data)
+        dir_list=(logs tmp analysis)
         for pd in "${dir_list[@]}"; do makeDirs $output_dir/$pd; done
 
         ## logs
@@ -184,11 +180,12 @@ elif [[ "$pipeline" == "init" ]]; then
 	touch $log_dir/manifests/sample_ids.txt
 
         ## analysis
-        dir_list=(intermed qc/data reports)
+        dir_list=(intermed reports)
         for pd in "${dir_list[@]}"; do makeDirs $analysis_dir/$pd; done
 	
-        dir_list=(tree val)
-        for pd in "${dir_list[@]}"; do makeDirs $analysis_dir/intermed/$pd; done
+        ## tmp
+        dir_list=(amr gff pipeline qc/data rawdata/download rawdata/fastq rawdata/trimmed ncbi)
+        for pd in "${dir_list[@]}"; do makeDirs $tmp_dir/$pd; done
 
         ##log file
         touch $pipeline_log
@@ -226,7 +223,8 @@ elif [[ "$pipeline" == "analysis" ]]; then
                 "${pipeline_log}" \
                 "${subworkflow}" \
                 "${resume}" \
-                "${testing}"
+                "${testing}" \
+                "${pipeline_results}"
 
 ################################## Run TREE
 elif [[ "$pipeline" == "tree" ]]; then

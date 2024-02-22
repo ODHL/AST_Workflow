@@ -10,6 +10,7 @@ pipeline_log=$6
 subworkflow=$7
 resume=$8
 testing=$9
+pipeline_results=$10
 
 #########################################################
 # Pipeline controls
@@ -50,29 +51,25 @@ source $(dirname "$0")/core_functions.sh
 eval $(parse_yaml ${pipeline_config} "config_")
 
 #########################################################
-# Set dirs, files, args
+# Core dir, Configs
 #########################################################
 # set dirs
 log_dir=$output_dir/logs
-manifest_dir=$log_dir/manifests
-
-# pipeline raw output
-pipeline_dir=$output_dir/pipeline
-
-## final analysis output
-analysis_dir=$output_dir/analysis
-intermed_dir=$analysis_dir/intermed
-qc_dir=$analysis_dir/qc/data
-ncbi_dir=$output_dir/ncbi/data
-tree_dir=$intermed_dir/tree
-val_dir=$intermed_dir/val
-
-## tmp dir
 tmp_dir=$output_dir/tmp
+analysis_dir=$output_dir/analysis
+manifest_dir=$log_dir/manifests
+pipeline_dir=$output_dir/tmp/pipeline
+intermed_dir=$analysis_dir/intermed
+qc_dir=$tmp_dir/qc/data
+ncbi_dir=$tmpdir/ncbi/data
+gff_dir=$tmp_dir/gff
+amr_dir=$tmp_dir/amr
+dl_dir=$tmp_dir/rawdata/download
+fastq_dir=$tmp_dir/rawdata/fastq
+trimm_dir=$tmp_dir/rawdata/trimmed
 
 # set files
-pipeline_results=$intermed_dir/pipeline_results.tsv
-pipeline_results_clean=$intermed_dir/pipeline_results_clean.tsv
+phoenix_results=$analysis_dir/intermed/pipeline_results_phoenix.tsv
 sample_id_file=$log_dir/manifests/sample_ids.txt
 
 # set variables
@@ -111,30 +108,15 @@ if [ -z "$project_number" ]; then
 	$config_basespace_cmd list projects --filter-term="${project_name_full}"
 	project_number="123456789"
 fi
-#############################################################################################
-# LOG INFO TO CONFIG
-#############################################################################################
-message_cmd_log "--- CONFIG INFORMATION ---"
-message_cmd_log "Sequence run date: $date_stamp"
-message_cmd_log "Analysis date: `date`"
-message_cmd_log "Pipeline version: $ODH_version"
-message_cmd_log "Phoenix version: $phoenix_version"
-message_cmd_log "Dryad version: $dryad_version"
-message_cmd_log "Starting time: `date`"
-message_cmd_log "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`"
-
-message_cmd_log "------------------------------------------------------------------------"
-message_cmd_log "--- STARTING ANALYSIS ---"
-
-message_cmd_log "Starting time: `date`"
-message_cmd_log "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`"
 
 #############################################################################################
 # Batching
 #############################################################################################
 if [[ $flag_batch == "Y" ]]; then
-	echo "--Creating batch files"
-
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--- BATCHING ---"
+	message_cmd_log "------------------------------------------------------------------------"
+	
 	#read in text file with all project id's
 	IFS=$'\n' read -d '' -r -a raw_list < config/sample_ids.txt
 	if [[ -f $sample_id_file ]];then rm $sample_id_file; fi
@@ -167,11 +149,7 @@ if [[ $flag_batch == "Y" ]]; then
 			echo "sample,fastq_1,fastq_2" > $log_dir/manifests/samplesheet_${batch_name}.csv
 			
 			# create batch dirs
-			fastq_batch_dir=$tmp_dir/batch_$batch_name/rawdata
-			tmp_batch_dir=$tmp_dir/batch_$batch_name/download
-			pipeline_batch_dir=$tmp_dir/batch_$batch_name/pipeline
-			makeDirs $fastq_batch_dir
-			makeDirs $tmp_batch_dir
+			pipeline_batch_dir=$tmp_dir/pipeline/batch_$batch_name
 			makeDirs $pipeline_batch_dir
 			makeDirs $pipeline_batch_dir/$project_number
         fi
@@ -180,7 +158,7 @@ if [[ $flag_batch == "Y" ]]; then
 	   	echo ${sample_id} >> $batch_manifest                
 		
 		# prepare samplesheet
-        echo "${sample_id},$fastq_batch_dir/$sample_id.R1.fastq.gz,$fastq_batch_dir/$sample_id.R2.fastq.gz">>$samplesheet
+        echo "${sample_id},$fastq_dir/$sample_id.R1.fastq.gz,$fastq_dir/$sample_id.R2.fastq.gz">>$samplesheet
 
     	#increase sample counter
     	((sample_count+=1))
@@ -218,7 +196,7 @@ if [[ $flag_batch == "Y" ]]; then
 	fi
 
 	#log
-	message_cmd_log "----A total of $sample_final samples will be processed in $batch_count batches, with a maximum of $config_batch_limit samples per batch"
+	# message_cmd_log "----A total of $sample_final samples will be processed in $batch_count batches, with a maximum of $config_batch_limit samples per batch"
 fi
 
 #############################################################################################
@@ -230,6 +208,9 @@ batch_min=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | head -1 |
 if [[ $flag_download == "Y" ]]; then
 	
 	# output start message
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--- DWONLOADING ---"
+	message_cmd_log "------------------------------------------------------------------------"
 	message_cmd_log "--Downloading analysis files (this may take a few minutes to begin)"
 	message_cmd_log "---Starting time: `date`"
 	
@@ -241,8 +222,6 @@ if [[ $flag_download == "Y" ]]; then
 		
 		# set batch manifest, dirs
 		batch_manifest=$manifest_dir/batch_${batch_name}.txt
-		fastq_batch_dir=$tmp_dir/batch_$batch_name/rawdata
-		tmp_batch_dir=$tmp_dir/batch_$batch_name/download
 		samplesheet=$manifest_dir/samplesheet_${batch_name}.csv	
 		
 		# read text file
@@ -251,19 +230,20 @@ if [[ $flag_download == "Y" ]]; then
 		for sample_id in ${batch_list[@]}; do
 			echo "$batch_manifest"
 			echo "$sample_id"
-			$config_basespace_cmd download biosample --quiet -n "${sample_id}" -o $tmp_batch_dir
+			$config_basespace_cmd download biosample --quiet -n "${sample_id}" -o $dl_dir
+			mv $dl_dir/$sample_id*/*gz $fastq_dir
 		done
 
 		# move to final dir, clean
-		mv $tmp_batch_dir/*/*gz $fastq_batch_dir
-		for f in $fastq_batch_dir/*gz; do
+		for f in $fastq_dir/*gz; do
 			new=$(clean_file_names $f)
 			mv $f $new
 		done
 		clean_file_insides $samplesheet
 		clean_file_insides $batch_manifest
-		rm -rf $tmp_batch_dir
 	done
+
+	rm -rf $dl_dir
 
 	# output end message
 	message_cmd_log "---Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
@@ -273,8 +253,30 @@ fi
 # Analysis
 #############################################################################################
 if [[ $flag_analysis == "Y" ]]; then
-	#log
+	#############################################################################################
+	# LOG INFO TO CONFIG
+	#############################################################################################
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--- CONFIG INFORMATION ---"
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "Sequence run date: $date_stamp"
+	message_cmd_log "Analysis date: `date`"
+	message_cmd_log "Pipeline version: $ODH_version"
+	message_cmd_log "Phoenix version: $phoenix_version"
+	message_cmd_log "Dryad version: $dryad_version"
+	message_cmd_log "Starting time: `date`"
+	message_cmd_log "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`"
+
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--- STARTING ANALYSIS ---"
+	message_cmd_log "------------------------------------------------------------------------"
+
+	message_cmd_log "Starting time: `date`"
+	message_cmd_log "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`"
 	message_cmd_log "--Processing batches:"
+
+	# create pipeline output file
+	if [[ -f $phoenix_results ]]; then touch $phoenix_results; fi
 
 	#for each batch
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
@@ -288,7 +290,6 @@ if [[ $flag_analysis == "Y" ]]; then
 		samplesheet=$log_dir/manifests/samplesheet_$batch_name.csv
 
 		# move to project dir
-		if [[ ! -d $pipeline_batch_dir/$project_number ]]; then mkdir -p $pipeline_batch_dir/$project_number; fi
 		cd $pipeline_batch_dir/$project_number
 
 		# set command
@@ -325,28 +326,24 @@ if [[ $flag_analysis == "Y" ]]; then
 			message_cmd_log "--------------------------------------------------------"
 
 			# add to  master pipeline results
-			cat $pipeline_batch_dir/Phoenix_Summary.tsv >> $pipeline_results
+			cat $pipeline_batch_dir/Phoenix_Summary.tsv >> $phoenix_results
 			cp $pipeline_batch_dir/pipeline_info/* $log_dir/pipeline
+			cp $pipeline_batch_dir/*/*.synopsis $log_dir/pipeline
 			cp $pipeline_batch_dir/*/qc_stats/* $qc_dir
-			cp $pipeline_batch_dir/*/annotation/*gff $tree_dir
-			cp $pipeline_batch_dir/*/fastp_trimd/*gz $tree_dir
-			cp $pipeline_batch_dir/*/gamma_ar/*.gamma $val_dir
-			cp $pipeline_batch_dir/*/amr/*_all_genes.tsv $val_dir
+			cp $pipeline_batch_dir/*/annotation/*gff $gff_dir
+			cp $pipeline_batch_dir/*/fastp_trimd/*gz $trimm_dir
+			cp $pipeline_batch_dir/*/gamma_ar/*.gamma $amr_dir
+			cp $pipeline_batch_dir/*/AMRFinder/*_all_genes.tsv $amr_dir
 
 			# log
 			message_cmd_log "-------Ending time: `date`"
 			message_cmd_log "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`"
 
 			#############################################################################################
-			# FASTQ
-			#############################################################################################	
-			cp $pipeline_batch_dir/*.gz $ncbi_dir
-
-			#############################################################################################
 			# CLEANUP
 			#############################################################################################	
 			#remove intermediate files
-			if [[ $flag_cleanup == "Y" ]] && [[ -f $pipeline_results ]]; then
+			if [[ $flag_cleanup == "Y" ]] && [[ -f $phoenix_results ]]; then
 				sudo rm -r --force $pipeline_batch_dir
 				mv $batch_manifest $log_dir/manifests/complete
 			fi
@@ -364,38 +361,39 @@ fi
 #############################################################################################
 if [[ $flag_post == "Y" ]]; then
 	#log
-	message_cmd_log "--Quality Analysis"
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--- POST ANALYSIS ---"
+	message_cmd_log "------------------------------------------------------------------------"
 
 	# create tmp copy of results
+	if [[ -f tmp_output.csv ]]; then rm tmp_output.csv; fi
 	tmp_file=tmp_output.csv
-	cp $pipeline_results $tmp_file
+	cp $phoenix_results $tmp_file
 	sed -i "s/\t/;/g" $tmp_file
 
-	if [[ -f $pipeline_results_clean ]]; then rm $pipeline_results_clean; fi
-	touch $pipeline_results_clean
+	# review synopsis and determine status
+	for sample_id in "${sample_list[@]}"; do
+		# determine number of warnings, fails
+		num_of_warnings=`cat $log_dir/pipelines/$sample_id.synopsis | grep "WARNING"`
+		num_of_fails=`cat $log_dir/pipelines/$sample_id.synopsis | grep "FAIL"`
 
-	# read in all samples
-	for id in "${sample_list[@]}"; do
-		echo "--$id"
-		# pull the needed variables
+		# pull the rowid of results
+		# awk -F";" -v i=$SID 'BEGIN {OFS = FS} NR==i {$2="PASS"}1' $tmp_file > $pipeline_results_clean
 		SID=$(awk -F";" -v sid=$id '{ if ($1 == sid) print NR }' $tmp_file)
-		Estimated_Coverage=`cat $tmp_file | awk -F";" -v i=$SID 'FNR == i {print $4}' | cut -f1 -d"."`
 
-		# clear old coverage
-		sed -i "s/coverage_below_30(0)//g" $tmp_file
-
-		# check if the failure is real
-		cov_replace="coverage_below_30($Estimated_Coverage)"
-		if [[ $Estimated_Coverage -gt 29 ]]; then
-			awk -F";" -v i=$SID 'BEGIN {OFS = FS} NR==i {$2="PASS"}1' $tmp_file > $pipeline_results_clean
-		else
-			awk -F";" -v i=$SID -v cov=$cov_replace 'BEGIN {OFS = FS} NR==i {$24=cov}1' $tmp_file > $pipeline_results_clean
+		if [[ $num_of_warnings -gt 3 ]]; then
+			awk -F";" -v i=$SID 'BEGIN {OFS = FS} NR==i {$2="FAIL"}1' $tmp_file > $pipeline_results
+			cp $pipeline_results $tmp_file
+			reason=`cat $log_dir/pipeline/$sample_id.synopsis | grep -v "Summarized" | grep -e "WARNING|FAIL" | awk -F": " '{print $3}' |  awk 'BEGIN { ORS = ";" } { print }'`
+			awk -F";" -v i=$SID -v reason=$reason 'BEGIN {OFS = FS} NR==i {$24=reason}1' $tmp_file > $pipeline_results
 		fi
 
 		# save changes
-		cp $pipeline_results_clean $tmp_file
+		cp $pipeline_results $tmp_file
     done
 
 	# cleanup
 	rm $tmp_file
+
+	ls $pipeline_results
 fi

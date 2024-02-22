@@ -61,7 +61,7 @@ include { PROKKA                         } from '../modules/local/prokka'
 include { GET_TAXA_FOR_AMRFINDER         } from '../modules/local/get_taxa_for_amrfinder'
 include { AMRFINDERPLUS_RUN              } from '../modules/local/run_amrfinder'
 include { CALCULATE_ASSEMBLY_RATIO       } from '../modules/local/assembly_ratio'
-include { CREATE_SUMMARY_LINE            } from '../modules/odhl/phoenix_summary_line'
+include { CREATE_SUMMARY_LINE            } from '../modules/local/phoenix_summary_line'
 include { FETCH_FAILED_SUMMARIES         } from '../modules/local/fetch_failed_summaries'
 include { GATHER_SUMMARY_LINES           } from '../modules/local/phoenix_summary'
 include { GRIPHIN                        } from '../modules/local/griphin'
@@ -232,11 +232,11 @@ workflow PHOENIX_EXTERNAL_SLIM {
         filtered_scaffolds_ch = BBMAP_REFORMAT.out.filtered_scaffolds.map{    meta, filtered_scaffolds -> [[id:meta.id], filtered_scaffolds]}
         .join(SCAFFOLD_COUNT_CHECK.out.outcome.splitCsv(strip:true, by:5).map{meta, fairy_outcome      -> [meta, [fairy_outcome[0][0], fairy_outcome[1][0], fairy_outcome[2][0], fairy_outcome[3][0], fairy_outcome[4][0]]]}, by: [0])
 
-        // // Running gamma to identify hypervirulence genes in scaffolds
-        // GAMMA_HV (
-        //     filtered_scaffolds_ch, params.hvgamdb
-        // )
-        // ch_versions = ch_versions.mix(GAMMA_HV.out.versions)
+        // Running gamma to identify hypervirulence genes in scaffolds
+        GAMMA_HV (
+            filtered_scaffolds_ch, params.hvgamdb
+        )
+        ch_versions = ch_versions.mix(GAMMA_HV.out.versions)
 
         // Running gamma to identify AR genes in scaffolds
         GAMMA_AR (
@@ -244,10 +244,10 @@ workflow PHOENIX_EXTERNAL_SLIM {
         )
         ch_versions = ch_versions.mix(GAMMA_AR.out.versions)
 
-        // GAMMA_PF (
-        //     filtered_scaffolds_ch, params.gamdbpf
-        // )
-        // ch_versions = ch_versions.mix(GAMMA_PF.out.versions)
+        GAMMA_PF (
+            filtered_scaffolds_ch, params.gamdbpf
+        )
+        ch_versions = ch_versions.mix(GAMMA_PF.out.versions)
 
         // Getting Assembly Stats
         QUAST (
@@ -370,9 +370,9 @@ workflow PHOENIX_EXTERNAL_SLIM {
             RENAME_FASTA_HEADERS.out.renamed_scaffolds, \
             BBMAP_REFORMAT.out.filtered_scaffolds, \
             DO_MLST.out.checked_MLSTs, \
-            empty_ch, \
+            GAMMA_HV.out.gamma, \
             GAMMA_AR.out.gamma, \
-            empty_ch, \
+            GAMMA_PF.out.gamma, \
             QUAST.out.report_tsv, \
             [], [], [], [], \
             KRAKEN2_WTASMBLD.out.report, \
@@ -391,9 +391,9 @@ workflow PHOENIX_EXTERNAL_SLIM {
         // Combining output based on meta.id to create summary by sample -- is this verbose, ugly and annoying? yes, if anyone has a slicker way to do this we welcome the input.
         line_summary_ch = GET_TRIMD_STATS.out.fastp_total_qc.map{meta, fastp_total_qc  -> [[id:meta.id], fastp_total_qc]}\
         .join(DO_MLST.out.checked_MLSTs.map{                             meta, checked_MLSTs   -> [[id:meta.id], checked_MLSTs]},   by: [0])\
-        .join(empty_ch.map{                                              meta, gamma           -> [[id:meta.id], gamma]},           by: [0])\
+        .join(GAMMA_HV.out.gamma.map{                                    meta, gamma           -> [[id:meta.id], gamma]},           by: [0])\
         .join(GAMMA_AR.out.gamma.map{                                    meta, gamma           -> [[id:meta.id], gamma]},           by: [0])\
-        .join(empty_ch.map{                                              meta, gamma           -> [[id:meta.id], gamma]},           by: [0])\
+        .join(GAMMA_PF.out.gamma.map{                                    meta, gamma           -> [[id:meta.id], gamma]},           by: [0])\
         .join(QUAST.out.report_tsv.map{                                  meta, report_tsv      -> [[id:meta.id], report_tsv]},      by: [0])\
         .join(CALCULATE_ASSEMBLY_RATIO.out.ratio.map{                    meta, ratio           -> [[id:meta.id], ratio]},           by: [0])\
         .join(GENERATE_PIPELINE_STATS_WF.out.pipeline_stats.map{         meta, pipeline_stats  -> [[id:meta.id], pipeline_stats]},  by: [0])\
