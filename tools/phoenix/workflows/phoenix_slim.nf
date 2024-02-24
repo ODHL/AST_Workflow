@@ -132,8 +132,7 @@ workflow PHOENIX_EXTERNAL_SLIM {
 
         //Combining reads with output of corruption check. By=2 is for getting R1 and R2 results
         //The mapping here is just to get things in the right bracket so we can call var[0]
-        read_stats_ch = INPUT_CHECK.out.reads.join(CORRUPTION_CHECK.out.outcome_to_edit, by: [0,0])
-        .join(CORRUPTION_CHECK.out.outcome.splitCsv(strip:true, by:2).map{meta, fairy_outcome -> [meta, [fairy_outcome[0][0], fairy_outcome[1][0]]]}, by: [0,0])
+        read_stats_ch = INPUT_CHECK.out.reads.join(CORRUPTION_CHECK.out.outcome_to_edit, by: [0,0]).join(CORRUPTION_CHECK.out.outcome.splitCsv(strip:true, by:2).map{meta, fairy_outcome -> [meta, [fairy_outcome[0][0], fairy_outcome[1][0]]]}, by: [0,0])
 
         //Get stats on raw reads if the reads aren't corrupted
         GET_RAW_STATS (
@@ -324,10 +323,6 @@ workflow PHOENIX_EXTERNAL_SLIM {
         )
         ch_versions = ch_versions.mix(PROKKA.out.versions)
 
-        /*// Fetch AMRFinder Database
-        AMRFINDERPLUS_UPDATE( )
-        ch_versions = ch_versions.mix(AMRFINDERPLUS_UPDATE.out.versions)*/
-
         // Create file that has the organism name to pass to AMRFinder
         GET_TAXA_FOR_AMRFINDER (
             DETERMINE_TAXA_ID.out.taxonomy
@@ -435,55 +430,10 @@ workflow PHOENIX_EXTERNAL_SLIM {
             all_summaries_ch, outdir_path, false
         )
         ch_versions = ch_versions.mix(GATHER_SUMMARY_LINES.out.versions)
-
-        // //create GRiPHin report
-        // GRIPHIN (
-        //     all_summaries_ch, INPUT_CHECK.out.valid_samplesheet, params.ardb, outdir_path, params.coverage, true, false
-        // )
-        // ch_versions = ch_versions.mix(GRIPHIN.out.versions)
-
-        // if (ncbi_excel_creation == true && params.create_ncbi_sheet == true) {
-        //     // requiring files so that this process doesn't start until needed files are made. 
-        //     required_files_ch = FASTP_TRIMD.out.reads.map{ meta, reads -> reads[0]}.collect().combine(DO_MLST.out.checked_MLSTs.map{ meta, checked_MLSTs -> checked_MLSTs}.collect()).combine(DETERMINE_TAXA_ID.out.taxonomy.map{ meta, taxonomy -> taxonomy}.collect())
-
-        //     //Fill out NCBI excel sheets for upload based on what PHX found
-        //     CREATE_NCBI_UPLOAD_SHEET (
-        //         required_files_ch, params.microbe_example, params.sra_metadata, params.osii_bioprojects, outdir_path, GRIPHIN.out.griphin_tsv_report
-        //     )
-        //     ch_versions = ch_versions.mix(CREATE_NCBI_UPLOAD_SHEET.out.versions)
-        // }
-
-        // // Collecting the software versions
-        // CUSTOM_DUMPSOFTWAREVERSIONS (
-        //     ch_versions.unique().collectFile(name: 'collated_versions.yml')
-        // )
-
-        //
-        // MODULE: MultiQC
-        //
-        // workflow_summary    = WorkflowPhoenix.paramsSummaryMultiqc(workflow, summary_params)
-        // ch_workflow_summary = Channel.value(workflow_summary)
-
-        // ch_multiqc_files = Channel.empty()
-        // ch_multiqc_files = ch_multiqc_files.mix(Channel.from(ch_multiqc_config))
-        // ch_multiqc_files = ch_multiqc_files.mix(ch_multiqc_custom_config.collect().ifEmpty([]))
-        // ch_multiqc_files = ch_multiqc_files.mix(ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
-        // ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
-        // ch_multiqc_files = ch_multiqc_files.mix(FASTQCTRIMD.out.zip.collect{it[1]}.ifEmpty([]))
-        // ch_multiqc_files = ch_multiqc_files.mix(FASTP_TRIMD.out.json.collect{it[1]}.ifEmpty([]))
-        // ch_multiqc_files = ch_multiqc_files.mix(FASTP_SINGLES.out.json.collect{it[1]}.ifEmpty([]))
-        // ch_multiqc_files = ch_multiqc_files.mix(BBDUK.out.log.collect{it[1]}.ifEmpty([]))
-        // ch_multiqc_files = ch_multiqc_files.mix(QUAST.out.report_tsv.collect{it[1]}.ifEmpty([]))
-        // ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_TRIMD.out.report.collect{it[1]}.ifEmpty([]))
-        // ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_WTASMBLD.out.report.collect{it[1]}.ifEmpty([]))
-
-        // MULTIQC (
-        //     ch_multiqc_files.collect()
-        // )
-        // multiqc_report = MULTIQC.out.report.toList()
-        // ch_versions    = ch_versions.mix(MULTIQC.out.versions)
     
     emit:
+        reads  = INPUT_CHECK.out.reads
+        outcome = CORRUPTION_CHECK.out.outcome
         scaffolds        = BBMAP_REFORMAT.out.filtered_scaffolds
         trimmed_reads    = FASTP_TRIMD.out.reads
         mlst             = DO_MLST.out.checked_MLSTs
