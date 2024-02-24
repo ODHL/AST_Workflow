@@ -29,6 +29,7 @@ if (params.kraken2db == null) { exit 1, 'Input path to kraken2db not specified!'
 ========================================================================================
 */
 
+include { BUILD_TREE                } from './workflows/build_tree'
 include { PHOENIX_EXTERNAL_SLIM     } from './workflows/phoenix_slim'
 include { PHOENIX_EXTERNAL          } from './workflows/phoenix'
 include { PHOENIX_EXQC              } from './workflows/cdc_phoenix'
@@ -89,18 +90,27 @@ workflow PHOENIX_SLIM {
 
     main:
         PHOENIX_EXTERNAL_SLIM ( ch_input, ch_versions, true )
-    emit:
-        scaffolds        = PHOENIX_EXTERNAL_SLIM.out.scaffolds
-        trimmed_reads    = PHOENIX_EXTERNAL_SLIM.out.trimmed_reads
-        mlst             = PHOENIX_EXTERNAL_SLIM.out.mlst
-        amrfinder_output = PHOENIX_EXTERNAL_SLIM.out.amrfinder_output
-        gamma_ar         = PHOENIX_EXTERNAL_SLIM.out.gamma_ar
-        phx_summary      = PHOENIX_EXTERNAL_SLIM.out.phx_summary
 }
 
 //
 // WORKFLOW: Run internal version of cdcgov/phoenix analysis pipeline that includes BUSCO, SRST2 and KRAKEN_ASMBLED
 //
+
+//
+// WORKFLOW: Create tree for inputs
+//
+workflow TREE {
+    if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry PHOENIX: Input samplesheet not specified!' }
+
+    main:
+        BUILD_TREE ( ch_input )
+
+    emit:
+        distmatrix  = BUILD_TREE.out.distmatrix
+        core_stats  = BUILD_TREE.out.core_stats
+        tree        = BUILD_TREE.out.tree
+}
+
 
 workflow CDC_PHOENIX {
     // Validate input parameters
