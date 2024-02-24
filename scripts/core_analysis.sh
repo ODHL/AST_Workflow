@@ -10,7 +10,7 @@ pipeline_log=$6
 subworkflow=$7
 resume=$8
 testing=$9
-pipeline_results=$10
+pipeline_results="${10}"
 
 #########################################################
 # Pipeline controls
@@ -366,26 +366,32 @@ if [[ $flag_post == "Y" ]]; then
 	message_cmd_log "------------------------------------------------------------------------"
 
 	# create tmp copy of results
-	if [[ -f tmp_output.csv ]]; then rm tmp_output.csv; fi
 	tmp_file=tmp_output.csv
+	if [[ -f $tmp_file ]]; then rm $tmp_file; fi
 	cp $phoenix_results $tmp_file
 	sed -i "s/\t/;/g" $tmp_file
 
+	# if there is no changes for the first sample, set file
+	cp $tmp_file $pipeline_results
+
 	# review synopsis and determine status
 	for sample_id in "${sample_list[@]}"; do
-		# determine number of warnings, fails
-		num_of_warnings=`cat $log_dir/pipelines/$sample_id.synopsis | grep "WARNING"`
-		num_of_fails=`cat $log_dir/pipelines/$sample_id.synopsis | grep "FAIL"`
+		# pull only ID
+		sample_id=$(clean_file_names $sample_id)
+
+		# set synoposis file
+		synopsis=$log_dir/pipeline/$sample_id.synopsis
+
+		# # determine number of warnings, fails
+		num_of_warnings=`cat $synopsis | grep -v "WARNINGS" | grep "WARNING" | wc -l`
+		num_of_fails=`cat $synopsis | grep -v "completed as FAILED" | grep "FAILED" | wc -l`
 
 		# pull the rowid of results
 		# awk -F";" -v i=$SID 'BEGIN {OFS = FS} NR==i {$2="PASS"}1' $tmp_file > $pipeline_results_clean
-		SID=$(awk -F";" -v sid=$id '{ if ($1 == sid) print NR }' $tmp_file)
-
-		if [[ $num_of_warnings -gt 3 ]]; then
-			awk -F";" -v i=$SID 'BEGIN {OFS = FS} NR==i {$2="FAIL"}1' $tmp_file > $pipeline_results
-			cp $pipeline_results $tmp_file
-			reason=`cat $log_dir/pipeline/$sample_id.synopsis | grep -v "Summarized" | grep -e "WARNING|FAIL" | awk -F": " '{print $3}' |  awk 'BEGIN { ORS = ";" } { print }'`
-			awk -F";" -v i=$SID -v reason=$reason 'BEGIN {OFS = FS} NR==i {$24=reason}1' $tmp_file > $pipeline_results
+		SID=$(awk -F";" -v sid=$sample_id '{ if ($1 == sid) print NR }' $tmp_file)
+		if [[ $num_of_warnings -gt 2 ]]; then
+			reason=$(cat $synopsis | grep -v "Summarized" | grep -E "WARNING|FAIL" | awk -F": " '{print $3}' |  awk 'BEGIN { ORS = "; " } { print }' | sed "s/; ; //g")
+			cat $tmp_file | awk -F";" -v i=$SID -v reason="${reason}" 'BEGIN {OFS = FS} NR==i {$2="FAIL"; $24=reason}1' > $pipeline_results
 		fi
 
 		# save changes
@@ -394,6 +400,5 @@ if [[ $flag_post == "Y" ]]; then
 
 	# cleanup
 	rm $tmp_file
-
 	ls $pipeline_results
 fi

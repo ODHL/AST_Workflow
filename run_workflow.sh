@@ -184,7 +184,7 @@ elif [[ "$pipeline" == "init" ]]; then
         for pd in "${dir_list[@]}"; do makeDirs $analysis_dir/$pd; done
 	
         ## tmp
-        dir_list=(amr gff pipeline qc/data rawdata/download rawdata/fastq rawdata/trimmed ncbi)
+        dir_list=(amr gff pipeline/tree qc/data rawdata/download rawdata/fastq rawdata/trimmed ncbi tree)
         for pd in "${dir_list[@]}"; do makeDirs $tmp_dir/$pd; done
 
         ##log file
@@ -228,7 +228,7 @@ elif [[ "$pipeline" == "analysis" ]]; then
 
 ################################## Run TREE
 elif [[ "$pipeline" == "tree" ]]; then
-        bash scripts/build_tree.sh \
+        bash scripts/core_tree.sh \
                 "${output_dir}" \
                 "${project_name_full}" \
                 "${pipeline_config}" \
@@ -241,16 +241,18 @@ elif [[ "$pipeline" == "wgs" ]]; then
         bash scripts/core_wgs_id.sh \
                 $output_dir \
                 $project_name \
-                $wgs_results
+                $wgs_results \
+                $pipeline_results
 ################################## Run NCBI
 elif [[ "$pipeline" == "ncbi" ]]; then        
         bash scripts/core_ncbi.sh \
-        $output_dir \
-        $project_name \
-        $pipeline_config \
-        $wgs_results \
-        $ncbi_results \
-        $subworkflow
+                $output_dir \
+                $project_name \
+                $pipeline_config \
+                $wgs_results \
+                $ncbi_results \
+                $subworkflow \
+                $pipeline_results
 ################################## Run reporting
 elif [[ "$pipeline" == "report" ]]; then
         bash scripts/core_report.sh \

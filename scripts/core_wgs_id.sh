@@ -5,7 +5,11 @@
 output_dir=$1
 project_id=$2
 wgs_results=$3
+pipeline_results=$4
 
+#########################################################
+# Pipeline controls
+########################################################
 flag_ids="Y"
 
 ##########################################################
@@ -13,16 +17,17 @@ flag_ids="Y"
 #########################################################
 wgs_dir="/home/ubuntu/workflows/AR_Workflow/wgs_db"
 
-pipeline_results=$output_dir/analysis/intermed/pipeline_results_clean.tsv
-
 ##########################################################
 # Run code
 #########################################################
-
 # read in final report; create sample list
 IFS=$'\n' read -d '' -r -a sample_list < $output_dir/logs/manifests/sample_ids.txt
 
 if [[ $flag_ids == "Y" ]]; then
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--- WGS IDS ---"
+	message_cmd_log "------------------------------------------------------------------------"
+
     # create cache of local
     today=`date +%Y%m%d`
     cached_db=$wgs_dir/${today}_wgs_db.csv
