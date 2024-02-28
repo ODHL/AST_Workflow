@@ -17,7 +17,7 @@ sub.title: 'Antimicrobial Resistance Report'
 summary.paragraph: |
   This report describes the relatedness between a set of bacterial genomes.
 methods.text: |
-  The figures shown here were generated using sequence data processed with the [ODH AST](https://github.com/ODHL/AST_Workflow) data analysis pipeline. SNPs were called using the [Center for Food Safety and Applied Nutrition (CFSAN) SNP](https://github.com/CFSAN-Biostatistics/snp-pipeline) pipeline. If you have questions about this report please contact [Samantha Chill](samantha.chill@odh.ohio.gov).
+  The figures shown here were generated using sequence data processed with the [ODH AR](https://github.com/ODHL/AST_Workflow) data analysis pipeline. If you have questions about this report please contact [Samantha Chill](samantha.chill@odh.ohio.gov).
   The following databases are utilized to generate the data within this report:
  
   1) [AMRFinderPlus database](https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/): [Version 2023-04-17.1](https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/3.11/)
