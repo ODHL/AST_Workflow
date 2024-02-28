@@ -30,8 +30,8 @@ helpFunction()
    echo -e "\t-t Y,N option to run test settings (default N)"
    echo "Usage: $6 -m [OPTIONAL] merged_projects"
    echo -e "\t-m list of comma sep projects"
-   echo "Usage: $7 -o [OPTIONAL] report_flag"
-   echo -e "\t-o type of report [BASIC OUTBREAK NOVEL REGIONAL TIME]"
+   echo "Usage: $7 -o [OPTIONAL] outbreak_id"
+   echo -e "\t-o the OB id OB2401"
 
    exit 1 # Exit script after printing help
 }
@@ -44,7 +44,7 @@ do
         s ) subworkflow="$OPTARG" ;;
        	r ) resume="$OPTARG" ;;
        	t ) testing="$OPTARG" ;;
-        o ) report_flag="$OPTARG" ;;
+        o ) outbreak_id="$OPTARG" ;;
         m ) merged_projects="$OPTARG" ;;
         ? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
    esac
@@ -240,7 +240,7 @@ elif [[ "$pipeline" == "tree" ]]; then
 elif [[ "$pipeline" == "wgs" ]]; then
         bash scripts/core_wgs_id.sh \
                 $output_dir \
-                $project_name \
+                $project_name_full \
                 $wgs_results \
                 $pipeline_results
 ################################## Run NCBI
@@ -252,17 +252,20 @@ elif [[ "$pipeline" == "ncbi" ]]; then
                 $wgs_results \
                 $ncbi_results \
                 $subworkflow \
-                $pipeline_results
+                $pipeline_results \
+                "${pipeline_log}"
 ################################## Run reporting
 elif [[ "$pipeline" == "report" ]]; then
         bash scripts/core_report.sh \
                 $output_dir \
-                $project_name \
+                $project_name_full \
                 $pipeline_results \
                 $wgs_results \
                 $ncbi_results \
                 $subworkflow \
-                $pipeline_config
+                $pipeline_config \
+                "${pipeline_log}" \
+                $outbreak_id
 
 ################################## Run merge
 elif [[ "$pipeline" == "merge" ]]; then
