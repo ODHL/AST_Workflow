@@ -26,10 +26,9 @@ ResFinder: "v2.1.0 including until 2023-04-12 commit f46d8fc"
 AMRFinder: "v2023-04-17.1"
 MLST: "pulled from from PubMLST.org 2023-05-02"
 
-wgsID_script: "/home/ubuntu/workflows/AR_workflow/scripts/core_wgs_id.sh"
 metadata_file: "METADATAFILE"
 
-logo_file: "/home/ubuntu/workflows/AR_workflow/assets/odh_logo_240127.png"
+logo_file: "/home/ubuntu/workflows/AR_Workflow/assets/odh_logo_240128.png"
 
 ###############################
 # PARAMS REQUIRED
