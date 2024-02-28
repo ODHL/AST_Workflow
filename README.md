@@ -1,0 +1,1 @@
+SNPs were called using the [Center for Food Safety and Applied Nutrition (CFSAN) SNP](https://github.com/CFSAN-Biostatistics/snp-pipeline) pipeline.
