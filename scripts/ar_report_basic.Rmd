@@ -8,7 +8,7 @@ output:
       - { title: "ODHL", href:
       "https://odh.ohio.gov/know-our-programs/microbiology/microbiology",
       align_right}
-    logo: "test.png"
+    logo: "REP_LOGO"
 params:
   configFILE: "REP_CONFIG"
   projectname: "REP_PROJID"
@@ -139,6 +139,18 @@ qc_nums=generate_ids(c("specimen_id","estimated_coverage","genome_length",
 sample_meta=SharedData$new(sampleDF)
 ```
 
+```{r summarytext, echo=FALSE}
+pass_n=nrow(subset(sampleDF, auto_qc_outcome=="PASS"))
+failed_n=nrow(subset(sampleDF, auto_qc_outcome!="PASS"))
+failed_samples=subset(sampleDF, auto_qc_outcome!="PASS")$specimen_id
+# generate summary test for outupt
+summaryTEXT=paste0("There were ", nrow(sampleDF)," samples analyzed and ",
+                   pass_n, " samples passed quality control thresholds.")
+if(failed_n>0){
+  summaryTEXT=paste0(summaryTEXT," Failing samples included: ",failed_samples)
+}
+```
+
 Information {data-orientation=columns data-icon="fa-info-circle"}
 =================================================================
 Column {data-width=600}
@@ -156,6 +168,9 @@ pander(headerDF)
 `r methodsTEXT`
 Column {data-width=600}
 -----------------------
+### Summary
+`r summaryTEXT`
+
 ### DISCLAIMER
 `r disclaimerTEXT`
 

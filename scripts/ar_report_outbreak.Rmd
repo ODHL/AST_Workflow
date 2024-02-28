@@ -19,6 +19,7 @@ params:
   tree: "REP_TREE"
   cgstats: "REP_CORE"
   arpredictions: "REP_AR"
+  metadata: "REP_META"
   testing: "N"
 editor_options: 
   chunk_output_type: console
@@ -61,6 +62,7 @@ if (params$testing=="N"){
   tree=params$tree
   cgstats=params$cgstats
   arpredictions=params$arpredictions
+  metadata=params$metadata
 } else {
   projectname="OH-M6588-231201"
   outdir="OH-M6588-231201/"
@@ -70,6 +72,7 @@ if (params$testing=="N"){
   tree="core_genome.tree"
   cgstats="core_genome_statistics.txt"
   arpredictions="ar_predictions.tsv"
+  metadata="manifest.csv"
 }
 ```
 
@@ -97,28 +100,38 @@ methodsTEXT <- config$methods.text
 ## get sample table
 sampleDF <- read.csv2(sampletable,sep=",")
 sampleDF=subset(sampleDF,species!="species") #handles merged proj dups
-
-# get heatmap
-snpData <- read.csv2(snpmatrix,sep='\t',check.names = F,row.names = 1)
+sampleDF$specimen_id=sapply(strsplit(sampleDF$specimen_id,"-"), `[`, 1)
 
 # create species col list
 col_pal=brewer.pal(n = 8, name = "Dark2")
-species_colors=data.frame(unique(sampleDF$species))
-for (rid in rownames(species_colors)){
-  species_colors[rid,"colorID"]=col_pal[as.numeric(rid)]
+colors_species=data.frame(unique(sampleDF$species))
+for (rid in rownames(colors_species)){
+  colors_species[rid,"colorID"]=col_pal[as.numeric(rid)]
 }
-colnames(species_colors)=c("species","colID")
+colnames(colors_species)=c("species","colID")
 
-# create run col list
+# create category col list
 col_pal=brewer.pal(n = 8, name = "Set1")
-run_colors=data.frame(unique(sampleDF$run_id))
-for (rid in rownames(run_colors)){
-  run_colors[rid,"colorRUN"]=col_pal[as.numeric(rid)]
+colors_category=data.frame(unique(metadataDF$Category))
+for (rid in rownames(colors_category)){
+  colors_category[rid,"Category"]=col_pal[as.numeric(rid)]
 }
-colnames(run_colors)=c("run_id","colRUN")
+colnames(colors_category)=c("Category","colCat")
 
-# add col metadata
-sampleDF=merge(sampleDF,species_colors, by.x="species", by.y="species")
+# get metadata, add to sampleDF
+metadataDF = read.csv(metadata)
+
+# add col metadata and merge
+sampleDF=merge(sampleDF,colors_species, by.x="species", by.y="species")
+metadataDF=merge(metadataDF,colors_category, by.x="Category", by.y="Category")
+sampleDF=merge(sampleDF,metadataDF[,c("sampleID","Category","Project","colCat")], 
+               by.x="specimen_id", by.y="sampleID")
+
+# get heatmap
+snpData <- read.csv2(snpmatrix,sep='\t',check.names = F,row.names = 1)
+rownames(snpData)=sapply(strsplit(rownames(snpData),"-"), `[`, 1)
+colnames(snpData)=sapply(strsplit(colnames(snpData),"-"), `[`, 1)
+
 
 # get tree
 treepath <- tree
@@ -148,6 +161,18 @@ qc_nums=generate_ids(c("specimen_id","estimated_coverage","genome_length",
 sample_meta=SharedData$new(sampleDF)
 ```
 
+```{r summarytext, echo=FALSE}
+pass_n=nrow(subset(sampleDF, auto_qc_outcome=="PASS"))
+failed_n=nrow(subset(sampleDF, auto_qc_outcome!="PASS"))
+failed_samples=subset(sampleDF, auto_qc_outcome!="PASS")$specimen_id
+# generate summary test for outupt
+summaryTEXT=paste0("There were ", nrow(sampleDF)," samples analyzed and ",
+                   pass_n, " samples passed quality control thresholds.")
+if(failed_n>0){
+  summaryTEXT=paste0(summaryTEXT," Failing samples included: ",failed_samples)
+}
+```
+
 Information {data-orientation=columns data-icon="fa-info-circle"}
 =================================================================
 Column {data-width=600}
@@ -165,6 +190,9 @@ pander(headerDF)
 `r methodsTEXT`
 Column {data-width=600}
 -----------------------
+### Summary
+`r summaryTEXT`
+
 ### DISCLAIMER
 `r disclaimerTEXT`
 
@@ -181,6 +209,18 @@ filter_select(
   label = "QC Status",
   sharedData = sample_meta,
   group = ~auto_qc_outcome
+)
+filter_select(
+  id="Category",
+  label = "Category",
+  sharedData = sample_meta,
+  group = ~Category
+)
+filter_select(
+  id="run_id",
+  label = "Run ID",
+  sharedData = sample_meta,
+  group = ~run_id
 )
 ```
 
@@ -316,6 +356,7 @@ if(exists('treepath')){
     paste("Core Genes Identified: ",cgstats[cgstats$V1 == 'Core genes',3])
     paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])
   }
+  tree$tip.label=sapply(strsplit(tree$tip.label,"-"), `[`, 1)
   
   # set the root method
   if(config$root.method == 'midpoint'){
@@ -362,18 +403,37 @@ if(exists('treepath')){
   bs$label <- as.numeric(bs$label)
   #bs <- bs[bs$label > config$bootstrap.threshold,]
   ggtree_plot <- ggtree_basic + 
-    geom_text(data=bs,aes(label=label,hjust=-.4),size=2) + ggplot2::xlim(0, 25)
+    geom_text(data=bs,aes(label=label,hjust=-.4),size=2) + 
+    ggplot2::xlim(0, (tree$Nnode-2))
   ggtree_plot
   
   # create df for bar labels
   sampleDF$bar=1
+  d1 <- sampleDF[,c("specimen_id","bar","colCat","Category")]
+  d1$specimen_id=as.character(d1$specimen_id)
+  sorted_labels=as.data.frame(d)[1:nrow(sampleDF),]
+  sorted_labels=sorted_labels[rev(order(sorted_labels$y)),]$label
+  d1=d1[match(sorted_labels, d1$specimen_id),]
+  d1$specimen_id=factor(d1$specimen_id,levels=rev(d1$specimen_id))
+  p1=ggplot(d1, aes(x =specimen_id, y = bar, fill = Category)) +  
+    geom_bar(stat = "identity") +
+    geom_text( aes(label = Category),
+               colour = "white", size = 2,y=0.1,hjust=0)+
+    coord_flip() +
+    theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())+
+    theme(legend.position="none")+
+    scale_fill_manual(values=c(rev(d1$colCat)))
+  
   d1 <- sampleDF[,c("specimen_id","bar","colID","species")]
   d1$specimen_id=as.character(d1$specimen_id)
   sorted_labels=as.data.frame(d)[1:nrow(sampleDF),]
   sorted_labels=sorted_labels[rev(order(sorted_labels$y)),]$label
   d1=d1[match(sorted_labels, d1$specimen_id),]
   d1$specimen_id=factor(d1$specimen_id,levels=rev(d1$specimen_id))
-  
   p2=ggplot(d1, aes(x =specimen_id, y = bar, fill = specimen_id)) +  
     geom_bar(stat = "identity") +
     geom_text( aes(label = species),
@@ -386,8 +446,7 @@ if(exists('treepath')){
         axis.ticks.y=element_blank())+
     theme(legend.position="none")+
     scale_fill_manual(values=c(rev(d1$colID)))
-
-  ggarrange(ggtree_plot,p2, widths = c(2.5,1),ncol=2)
+  ggarrange(ggtree_plot,p1,p2, widths = c(3,1,1),ncol=3)
 }
 ```
 
