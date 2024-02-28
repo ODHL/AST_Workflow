@@ -3,9 +3,14 @@
 # ARGS
 #########################################################
 output_dir=$1
-project_id=$2
+project_name_full=$2
 wgs_results=$3
 pipeline_results=$4
+
+##########################################################
+# Eval, source
+#########################################################
+source $(dirname "$0")/core_functions.sh
 
 #########################################################
 # Pipeline controls
@@ -16,6 +21,12 @@ flag_ids="Y"
 # Set files, dir
 #########################################################
 wgs_dir="/home/ubuntu/workflows/AR_Workflow/wgs_db"
+
+#########################################################
+# project variables
+#########################################################
+# set project shorthand
+project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
 
 ##########################################################
 # Run code
@@ -43,7 +54,8 @@ if [[ $flag_ids == "Y" ]]; then
     # for each sample, check ID file
     first_grab="Y"
     for sample_id in ${sample_list[@]}; do
-        if [[ $sample_id != "ID" ]]; then
+        if [[ $sample_id != "ID" ]] || [[ $sample_id != "PASS" ]]; then
+            sample_id=$(clean_file_names $sample_id)
             echo "--sample: $sample_id"
 
             # check the QC status of the sample
@@ -84,7 +96,7 @@ if [[ $flag_ids == "Y" ]]; then
                     fi
 
                     # add sample with new ID to list
-                    add_line="$final_id,$sample_id,$project_id,$today"
+                    add_line="$final_id,$sample_id,$project_name,$today"
                     echo $add_line >> $cached_db
                     echo -e "$sample_id,$final_id" >> $wgs_results
                     

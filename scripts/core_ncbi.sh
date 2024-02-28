@@ -8,6 +8,7 @@ wgs_results=$4
 ncbi_results=$5
 subworkflow=$6
 pipeline_results=$7
+pipeline_log=$8
 
 #########################################################
 # Eval, source
@@ -24,6 +25,9 @@ date_stamp=`date '+%Y_%m_%d'`
 # set dirs
 log_dir=$output_dir/logs
 ncbi_dir=$output_dir/tmp/ncbi
+fastq_dir=$output_dir/tmp/rawdata/fastq
+
+# set files
 metadataFILE=${config_metadata_file}
 
 # set basespace command
@@ -68,7 +72,7 @@ if [[ $flag_batch == "Y" ]]; then
 		
 	# pull samples that have passed QC, have WGS-IDs
 	passed_samples="$ncbi_dir/passed_list.txt"
-	cat $pipeline_results | grep "PASS" | awk -F";" '{print $1}' > $passed_samples
+	cat $pipeline_results | grep "PASS" | awk -F";" '{print $1}' | uniq > $passed_samples
 
 	# split into chunks of 50
 	split $passed_samples $ncbi_dir/manifest_batch_ --numeric=1 -l 50 --numeric-suffixes --additional-suffix=.txt
@@ -115,7 +119,6 @@ if [[ $flag_manifests == "Y" ]]; then
 		for id in "${sample_list[@]}"; do
 			# set variables from wgs_results
 			wgsID=`cat $wgs_results | grep $id | awk -F"," '{print $2}'`
-
 			SID=$(awk -F";" -v sid=$id '{ if ($1 == sid) print NR }' $pipeline_results)
 			organism=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $14}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
 		
@@ -132,7 +135,8 @@ if [[ $flag_manifests == "Y" ]]; then
 				sample_title=`echo "Illumina Sequencing of ${wgsID}"`
 				
 				# pull source
-				isolation_source=`echo $meta | grep -o -e "Septum" -e "Tissue" -e "Wound" -e "Tracheal Aspirate" -e "Urine" -e "Blood" -e "Other" -e "RESP Endotrach"`
+				#isolation_source=`echo $meta | grep -o --e "Fluid (Body)_Sputum (bronchial scope)" -e "BA" -e "Septum" -e "Tissue" -e "Wound" -e "Tracheal Aspirate" -e "Urine" -e "Blood" -e "Other" -e "RESP Endotrach" -e "Tissue_Other`
+				isolation_source=`echo $meta | awk -F"," '{print $11}'`
 
 				# pull instrument
 				instrument_model=`echo $project_id | cut -f2 -d"-"| grep -o "^."`
@@ -173,7 +177,6 @@ if [[ $flag_fastqs == "Y" ]]; then
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
 		batch_dir="$ncbi_dir/batch_0$batch_id"
 		batch_manifest="$batch_dir/manifest_batch_0${batch_id}.txt"
-		fastq_dir=$output_dir/tmp/rawdata/fastq/batch_0$batch_id
 
 		# process samples
 		IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
@@ -189,7 +192,7 @@ if [[ $flag_fastqs == "Y" ]]; then
 		done
 	done
 fi
-	
+
 if [[ "$flag_precheck" == "Y" ]]; then
 	message_cmd_log "------------------------------------------------------------------------"
 	message_cmd_log "--- UPLOAD CHECK ---"
@@ -237,7 +240,10 @@ if [[ "$flag_post" == "Y" ]]; then
 		batch_dir="$ncbi_dir/batch_0$batch_id"
 		batch_manifest="$batch_dir/manifest_batch_0${batch_id}.txt"
 		ncbi_output=$batch_dir/*ok*
-		cp $ncbi_output $log_dir/manifests/pipeline
+
+		# cp manifests 
+		cp $batch_manifest $log_dir/manifests/ncbi_batch_0$batch_id.tsv
+		cp $ncbi_output $output_dir/analysis/intermed/ncbi_output_0$batch_id.tsv
 		
 		# process samples
 		IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest

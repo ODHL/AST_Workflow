@@ -1,26 +1,26 @@
-sample_manifest="sample_manifest.csv"
-output_dir="/home/ubuntu/output/ncbi"
-IFS=$'\n' read -d'' -r -a sample_data < $sample_manifest
+output_dir="$1"
+IFS=$'\n' read -d '' -r -a raw_list < config/sample_ids.txt
+
+raw_dir=$output_dir/tmp/rawdata
+srr_dir=$raw_dir/srr
+if [[ ! -d $srr_dir ]]; then mkdir -p $srr_dir; fi
 
 cd $output_dir
-for sdata in "${sample_data[@]}"; do
-    SRRNUM=`echo $sdata | cut -f3 -d","`
-    BANKID=`echo $sdata | cut -f4 -d","`
-    echo "--$SRRNUM | $BANKID"
-    if [[ ! -f $output_dir/tmp/${BANKID}_ds/${BANKID}_S7_L001_R1_001.fastq.gz ]]; then
-        echo "----fetching"
-        prefetch $SRRNUM
-        
-        echo "----FASTQ"
-        cd $SRRNUM
-        fastq-dump --outdir fastq --gzip --skip-technical  --readids --read-filter pass --dumpbase --split-3 --clip  $SRRNUM.sra
-        cd fastq
+for SRRNUM in "${raw_list[@]}"; do
+    if [[ $SRRNUM =~ "SRR" ]]; then
+        echo "--$SRRNUM"
+        if [[ ! -f "$raw_dir/${SRRNUM}*.gz" ]]; then
+            echo "----fetching"
+            prefetch $SRRNUM
+            
+            echo "----FASTQ"
+            cd $SRRNUM
+            fastq-dump --outdir fastq --gzip --skip-technical  --readids --read-filter pass --dumpbase --split-3 --clip  $SRRNUM.sra
+            cd fastq
 
-        echo "----cleaning"
-        if [[ ! -d $output_dir/tmp/${BANKID}_ds ]]; then mkdir -p $output_dir/tmp/${BANKID}_ds; fi
-        mv ${SRRNUM}_pass_1.fastq.gz $output_dir/tmp/${BANKID}_ds/${BANKID}_S7_L001_R1_001.fastq.gz
-        mv ${SRRNUM}_pass_2.fastq.gz $output_dir/tmp/${BANKID}_ds/${BANKID}_S7_L001_R2_001.fastq.gz
-        cd ../..
-        sudo rm -r $SRRNUM  
+            echo "----cleaning"
+            mv ${SRRNUM}_pass_1.fastq.gz $raw_dir/fastq/${SRRNUM}.R1.fastq.gz
+            mv ${SRRNUM}_pass_2.fastq.gz $raw_dir/fastq/${SRRNUM}.R2.fastq.gz
+        fi
     fi
 done

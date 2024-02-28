@@ -20,7 +20,7 @@ if [[ $subworkflow == "PREP" ]]; then
 	flag_prep="Y"
 elif [[ $subworkflow == "ANALYZE" ]]; then
 	flag_analysis="Y"
-elif [[ $subworkflow == "REPORT" ]]; then
+elif [[ $subworkflow == "POST" ]]; then
 	flag_report="Y"
 elif [[ $subworkflow == "ALL" ]]; then
 	flag_prep="Y"
@@ -145,25 +145,24 @@ fi
 
 if [[ $flag_report == "Y" ]]; then
 	message_cmd_log "------------------------------------------------------------------------"
-	message_cmd_log "--Creating tree:"
+	message_cmd_log "--TREE REPORT"
 	message_cmd_log "------------------------------------------------------------------------"
 	
-
 	#############################################################################################
 	# Move reports
 	#############################################################################################	
 	cp $pipeline_dir/ROARY/core_genome_statistics.txt $merged_roary
 	cp $pipeline_dir/TREE/core_genome.tree $merged_tree
 	cp $pipeline_dir/CFSAN/snp_distance_matrix.tsv $merged_snp
-	cp $pipeline_batch_dir/pipeline_info/* $log_dir/pipeline
+	cp $pipeline_dir/pipeline_info/* $log_dir/pipeline
 
 	#############################################################################################
 	# CLEANUP
 	#############################################################################################	
 	if [[ -f $merged_roary ]] && [[ -f $merged_tree ]] && [[ -f $merged_snp ]]; then
 		message_cmd_log "--Pipeline Completed `date`"
-		rm $pipeline_batch_dir
-		rm $trimm_dir
+		rm -rf $pipeline_dir
+		rm -rf $trimm_dir
 	else
 		message_cmd_log "--Pipeline FAILED `date`"
 		exit

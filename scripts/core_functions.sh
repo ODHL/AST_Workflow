@@ -67,3 +67,35 @@ makeDirs(){
 	new=$1
 	if [[ ! -d $$new ]]; then mkdir -p $new; fi
 }
+
+runMULTIQC(){
+	qc_report=$report_dir/multiqc_report.html
+	if [[ ! -f $qc_report ]]; then
+        multiqc -f -v \
+        -c $multiqc_config \
+        $fastqc_dir \
+        -o $qcreport_dir 2>&1 | tee -a $multiqc_log
+
+        mv $qcreport_dir/multiqc_report.html $qc_report
+    fi
+}
+
+prepREPORT(){
+	micropath=$1
+    intermedpath="$micropath/analysis/intermed"
+    reportpath="$micropath/analysis/reports"
+    arCONFIG="$micropath/logs/config/config_ar_report.yaml"
+	metapath="$micropath/metadata.csv"
+	todaysdate=$(date '+%Y-%m-%d')
+    sed -i "s~REP_CONFIG~$arCONFIG~g" $arRMD
+    sed -i "s/REP_PROJID/$project_name/g" $arRMD
+    sed -i "s~REP_OUT~$micropath/reports/~g" $arRMD
+    sed -i "s~REP_DATE~$todaysdate~g" $arRMD
+    sed -i "s~REP_ST~$reportpath/final_report.csv~g" $arRMD
+    sed -i "s~REP_SNP~$intermedpath/snp_distance_matrix.tsv~g" $arRMD
+    sed -i "s~REP_TREE~$intermedpath/core_genome.tree~g" $arRMD
+    sed -i "s~REP_CORE~$intermedpath/core_genome_statistics.txt~g" $arRMD
+    sed -i "s~REP_AR~$intermedpath/ar_predictions.tsv~g" $arRMD
+    sed -i "s~REP_LOGO~$config_logo_file~g" $arRMD
+    sed -i "s~REP_META~$metapath~g" $arRMD
+}

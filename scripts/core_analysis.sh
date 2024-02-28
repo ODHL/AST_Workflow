@@ -195,8 +195,8 @@ if [[ $flag_batch == "Y" ]]; then
 		sample_final=4
 	fi
 
-	#log
-	# message_cmd_log "----A total of $sample_final samples will be processed in $batch_count batches, with a maximum of $config_batch_limit samples per batch"
+	# log
+	message_cmd_log "----A total of $sample_final samples will be processed in $batch_count batches, with a maximum of $config_batch_limit samples per batch"
 fi
 
 #############################################################################################
@@ -228,8 +228,6 @@ if [[ $flag_download == "Y" ]]; then
 		IFS=$'\n' read -d '' -r -a batch_list < $batch_manifest
 
 		for sample_id in ${batch_list[@]}; do
-			echo "$batch_manifest"
-			echo "$sample_id"
 			$config_basespace_cmd download biosample --quiet -n "${sample_id}" -o $dl_dir
 			mv $dl_dir/$sample_id*/*gz $fastq_dir
 		done
