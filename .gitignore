@@ -29,7 +29,6 @@ hs_err_pid*
 kraken2db/
 
 # wgs
-wgs_db/
 config/sample_ids.txt
 
 # ignore large ref files; store on L drive
