@@ -190,8 +190,8 @@ if [[ $flag_outbreak == "Y" ]]; then
 
     # create final result file    
     for sample_id in "${sample_list[@]}"; do
-        cleanid=`echo $sample_id | cut -f1 -d"-"`
-		cat $output_dir/tmp/amr/${cleanid}*all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' $f | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence">> $merged_prediction
+		check=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $2}'`
+        cat $output_dir/tmp/amr/${cleanid}*all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' $f | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence">> $merged_prediction
 	done
 
     # set up reports

@@ -47,19 +47,16 @@ handle_fq(){
 }
 
 clean_file_insides(){
-	sed -i "s/[_-]ASTVAL//g" $1
-	sed -i "s/[_-]AST//g" $1
-	sed -i "s/-$project_name_full//g" $1
-	sed -i "s/-$project_name//g" $1		
-	sed -i "s/-OH//g" $1
-   	sed -i "s/_001//g" $1
-   	sed -i "s/_S[0-9]*_//g" $1
-   	sed -i "s/_L001//g" $1
+   sed -i -e "s/[-_]\(AR\|AST\)//g" $1
+   sed -i "s/-OH-\(M\|VH\)[0-9]*-[0-9]*//g" $1
+   sed -i "s/_001//g" $1
+	sed -i "s/_S[0-9]*_//g" $1
+   sed -i "s/_L001//g" $1
 }
 
 clean_file_names(){
-	out=`echo $1 | sed "s/[_-]ASTVAL//g" | sed "s/[_-]AST//g" | sed "s/-$project_name_full//g" | sed "s/-$project_name//g"`
-	out=`echo $out | sed "s/-OH//g" | sed "s/_S[0-9]*//g" | sed "s/_L001//g" | sed "s/_001//g" | sed "s/_R/.R/g"`
+	out=`echo $1 | sed -e "s/[-_]\(AR\|AST\)//g" | sed "s/-OH-\(M\|VH\)[0-9]*-[0-9]*//g"`
+	out=`echo $out | sed "s/_S[0-9]*//g" | sed "s/_L001//g" | sed "s/_001//g" | sed "s/_R/.R/g"`
    echo $out
 }
 

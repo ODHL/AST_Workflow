@@ -13,20 +13,29 @@ workflow INPUT_CHECK {
     SAMPLESHEET_CHECK_GFF ( samplesheet )
         .csv
         .splitCsv ( header:true, sep:',' )
-        .map { create_gff_paths (it) }
-        .set { gffs }
+        .map { create_fastq_channels(it) }
+        .set { reads }
 
     emit:
-    gffs                                     // channel: [ val(meta), [ gffs ] ]
+    reads                                     // channel: [ val(meta), [fastq1,fast2], [ gffs ] ]
     valid_samplesheet = SAMPLESHEET_CHECK_GFF.out.csv
 }
 
-// Function to get list of [ meta, [ gff ] ]
-def create_gff_paths(LinkedHashMap row) {
+// Function to get list of [ meta, [fastq1,fastq2], [ gff ] ]
+def create_fastq_channels(LinkedHashMap row) {
     def meta = [:]
     meta.id           = row.sample
 
     def array = []
-    array = [file(row.gff) ]
+    if (!file(row.fastq_1).exists()) {
+        exit 1, "ERROR: Please check input samplesheet -> Read 1 FastQ file does not exist!\n${row.fastq_1}"
+    }
+    if (!file(row.fastq_2).exists()) {
+        exit 1, "ERROR: Please check input samplesheet -> Read 2 FastQ file does not exist!\n${row.fastq_2}"
+    }
+    if (!file(row.gff).exists()) {
+        exit 1, "ERROR: Please check input samplesheet -> GFF file does not exist!\n${row.gff}"
+    }
+    array = [ meta, [ file(row.fastq_1), file(row.fastq_2) ], [file(row.gff)] ]
     return array
 }

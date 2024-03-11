@@ -106,9 +106,12 @@ workflow TREE {
         BUILD_TREE ( ch_input )
 
     emit:
-        distmatrix  = BUILD_TREE.out.distmatrix
-        core_stats  = BUILD_TREE.out.core_stats
-        tree        = BUILD_TREE.out.tree
+        valid_samplesheet            = BUILD_TREE.out.valid_samplesheet
+        bams                         = BUILD_TREE.out.bams
+        // distmatrix                   = BUILD_TREE.out.distmatrix
+        // core_stats  = BUILD_TREE.out.core_stats
+        // tree        = BUILD_TREE.out.tree
+        // samestr_db  = BUILD_TREE.out.samestr_db
 }
 
 

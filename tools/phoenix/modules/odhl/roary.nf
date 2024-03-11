@@ -20,7 +20,7 @@ process ROARY {
     script:
     def args = task.ext.args ?: ''
     """
-    roary -e $args -p $task.cpus -i 80 ${gff}
+    roary -e $args -p $task.cpus -i 90 ${gff}
     mv summary_statistics.txt core_genome_statistics.txt
     """
 }

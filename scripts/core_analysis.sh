@@ -104,7 +104,6 @@ fi
 # set projectID
 # check that access to the projectID is available before attempting to download
 if [ -z "$project_number" ]; then
-	echo "The project id was not found from $project_name_full. Review available project names below and try again"
 	$config_basespace_cmd list projects --filter-term="${project_name_full}"
 	project_number="123456789"
 fi
@@ -209,10 +208,10 @@ if [[ $flag_download == "Y" ]]; then
 	
 	# output start message
 	message_cmd_log "------------------------------------------------------------------------"
-	message_cmd_log "--- DWONLOADING ---"
+	message_cmd_log "--- DOWNLOADING ---"
 	message_cmd_log "------------------------------------------------------------------------"
 	message_cmd_log "--Downloading analysis files (this may take a few minutes to begin)"
-	message_cmd_log "---Starting time: `date`"
+	message_cmd_log "--Starting time: `date`"
 	
 	# for each batch
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
@@ -235,12 +234,11 @@ if [[ $flag_download == "Y" ]]; then
 		# move to final dir, clean
 		for f in $fastq_dir/*gz; do
 			new=$(clean_file_names $f)
-			mv $f $new
+			if [[ $f != $new ]]; then mv $f $new; fi
 		done
 		clean_file_insides $samplesheet
 		clean_file_insides $batch_manifest
 	done
-
 	rm -rf $dl_dir
 
 	# output end message
@@ -367,10 +365,9 @@ if [[ $flag_post == "Y" ]]; then
 	tmp_file=tmp_output.csv
 	if [[ -f $tmp_file ]]; then rm $tmp_file; fi
 	cp $phoenix_results $tmp_file
+	cp $phoenix_results $pipeline_results
 	sed -i "s/\t/;/g" $tmp_file
-
-	# if there is no changes for the first sample, set file
-	cp $tmp_file $pipeline_results
+	sed -i "s/\t/;/g" $pipeline_results
 
 	# review synopsis and determine status
 	for sample_id in "${sample_list[@]}"; do
@@ -398,5 +395,5 @@ if [[ $flag_post == "Y" ]]; then
 
 	# cleanup
 	rm $tmp_file
-	ls $pipeline_results
+	head $pipeline_results
 fi

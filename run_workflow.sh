@@ -143,25 +143,22 @@ elif [[ "$pipeline" == "phaseV" ]]; then
 
         # generate report
         bash validation/ast_validation.sh $subworkflow $project_name_full $output_dir $pipeline_log
-elif [[ "$pipeline" == "phaseM" ]]; then
+elif [[ "$pipeline" == "phaseO" ]]; then
         # init
-        bash run_workflow.sh -p init -n $project_id
+        bash run_workflow.sh -n $project_id -p init
 
-        # run merged analysis
-        bash run_workflow.sh -p merge -n $project_id -m $merged_projects -s PRE
+        # pull SRR samples
+        bash scripts/downloadSRR.sh $output_dir
 
         # run analysis
-        bash run_workflow.sh -p analysis -n $project_id -s ANALZYE
-        bash run_workflow.sh -p analysis -n $project_id -s POST
-
-        # run merged post
-        bash run_workflow.sh -p merge -n $project_id -m $merged_projects -s POST
+        bash run_workflow.sh -n $project_id -p analysis  -s ALL
 
         # run tree
-        bash run_workflow.sh -p tree -n $project_id -s ALL
+        bash run_workflow.sh -n $project_id -p tree -s ALL
 
         # create outbreak report
-        bash run_workflow.sh -p report -n $project_id -s OUTBREAK
+        bash run_workflow.sh -p report -n $project_id -s BASIC
+        bash run_workflow.sh -p report -n $project_id -s OUTBREAK -o OB2401
 
 #############################################################################################
 #############################################################################################
@@ -234,7 +231,9 @@ elif [[ "$pipeline" == "tree" ]]; then
                 "${pipeline_config}" \
                 "${pipeline_log}" \
                 "${resume}" \
-                "${subworkflow}"
+                "${subworkflow}" \
+                $pipeline_results \
+                "${project_name_full}"
 
 ################################## Run ID
 elif [[ "$pipeline" == "wgs" ]]; then
@@ -267,11 +266,6 @@ elif [[ "$pipeline" == "report" ]]; then
                 "${pipeline_log}" \
                 $outbreak_id
 
-################################## Run merge
-elif [[ "$pipeline" == "merge" ]]; then
-        bash scripts/merge_projects.sh \
-                "${merged_projects}" \
-                "${project_id}"
 ######################## Run validation
 elif [[ "$pipeline" == "validation" ]]; then
         # generate report

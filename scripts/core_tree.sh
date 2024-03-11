@@ -7,6 +7,8 @@ pipeline_config=$3
 pipeline_log=$4
 resume=$5
 subworkflow=$6
+pipeline_results=$7
+project_name_full=$8
 
 #########################################################
 # Pipeline controls
@@ -34,6 +36,7 @@ fi
 source $(dirname "$0")/core_functions.sh
 eval $(parse_yaml ${pipeline_config} "config_")
 
+project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
 #########################################################
 # Set dirs, files, args
 #########################################################
@@ -82,42 +85,40 @@ if [[ $flag_prep == "Y" ]]; then
 	message_cmd_log "--Prepping files"
 	message_cmd_log "------------------------------------------------------------------------"
 
+	# read in sample list
+	IFS=$'\n' read -d '' -r -a sample_list < $output_dir/logs/manifests/sample_ids.txt
+
 	# create samplesheet
 	if [[ -f $samplesheet ]]; then rm $samplesheet; fi
-	echo "sample,gff,fq1,fq2" > $samplesheet
+	echo "sample,gff,fastq_1,fastq_2" > $samplesheet
 
-	# create sample log
-	if [[ -f sample_list.txt ]]; then rm sample_list.txt; fi
-	for f in $gff_dir/*gff; do
-		filename="${f##*/}"
-		sample_id=`echo $filename | cut -f1 -d"."`
-		echo $sample_id >> sample_list.txt
+	# create sample log by checking status
+    for sample_id in ${sample_list[@]}; do
+		# check the QC status of the sample
+		sample_id=$(clean_file_names $sample_id)
+        check=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $2}'`
+		
+        # if the sample passed QC, assign a WGS ID
+        if [[ $check == "PASS" ]]; then
+			echo "pass"
+			# set output dir
+			fq_dest="$tree_dir/input_dir/$sample_id"
+			if [[ ! -d $fq_dest ]]; then mkdir -p $fq_dest; fi
+
+			# set files
+			gff="$gff_dir/$sample_id.gff"
+			fq1="${sample_id}_1.trim.fastq.gz"
+			fq2="${sample_id}_2.trim.fastq.gz"
+
+			# move files to subdir
+			handle_fq $fq_dest $fq1 $trimm_dir
+			handle_fq $fq_dest $fq2 $trimm_dir
+
+			# add to the samplesheet
+			echo "${sample_id},$gff,$fq1,$fq2" >> $samplesheet
+		fi
 	done
-
-	# read text file
-	IFS=$'\n' read -d '' -r -a sample_list < sample_list.txt
-
-	## create samplesheet
-	## move fq's to CFSAN dir
-	for sample_id in ${sample_list[@]}; do
-		# set output dir
-		fq_dest="$tree_dir/input_dir/$sample_id"
-		if [[ ! -d $fq_dest ]]; then mkdir -p $fq_dest; fi
-
-		# set files
-		gff="$gff_dir/$sample_id.gff"
-		fq1="${sample_id}_1.trim.fastq.gz"
-		fq2="${sample_id}_2.trim.fastq.gz"
-
-		# move files to subdir
-		handle_fq $fq_dest $fq1 $trimm_dir
-		handle_fq $fq_dest $fq2 $trimm_dir
-
-		# add to the samplesheet
-        echo "${sample_id},$gff,$fq1,$fq2" >> $samplesheet
-	done
-
-	rm sample_list.txt
+	cat $samplesheet
 fi
 
 if [[ $flag_analysis == "Y" ]]; then
@@ -126,6 +127,7 @@ if [[ $flag_analysis == "Y" ]]; then
 	message_cmd_log "--- CONFIG INFORMATION ---"
 	message_cmd_log "Analysis date: `date`"
 	message_cmd_log "Pipeline version: $ODH_version"
+	message_cmd_log "MetaPhlAn version: $config_MetaPhlAn_db"
 	message_cmd_log "------------------------------------------------------------------------"
 
 	message_cmd_log "------------------------------------------------------------------------"

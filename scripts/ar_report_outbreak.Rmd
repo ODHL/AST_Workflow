@@ -21,6 +21,7 @@ params:
   arpredictions: "REP_AR"
   metadata: "REP_META"
   testing: "N"
+  obid: "REP_OB"
 editor_options: 
   chunk_output_type: console
 ---
@@ -63,6 +64,7 @@ if (params$testing=="N"){
   cgstats=params$cgstats
   arpredictions=params$arpredictions
   metadata=params$metadata
+  obid=params$obid
 } else {
   projectname="OH-M6588-231201"
   outdir="OH-M6588-231201/"
@@ -84,7 +86,7 @@ config <- read_yaml(configFILE)
 subHeaderText = paste0(config$sub.title, ": ", reporttype)
 
 ## get header table
-headerDF <- data.frame(date=date,project=projectname,name=username)
+headerDF <- data.frame(date=date,ob=obid, project=projectname,name=username)
 
 ## get summary text
 summaryTEXT <- config$summary.paragraph
@@ -100,7 +102,9 @@ methodsTEXT <- config$methods.text
 ## get sample table
 sampleDF <- read.csv2(sampletable,sep=",")
 sampleDF=subset(sampleDF,species!="species") #handles merged proj dups
-sampleDF$specimen_id=sapply(strsplit(sampleDF$specimen_id,"-"), `[`, 1)
+
+# get metadata
+metadataDF = read.csv(metadata)
 
 # create species col list
 col_pal=brewer.pal(n = 8, name = "Dark2")
@@ -118,9 +122,6 @@ for (rid in rownames(colors_category)){
 }
 colnames(colors_category)=c("Category","colCat")
 
-# get metadata, add to sampleDF
-metadataDF = read.csv(metadata)
-
 # add col metadata and merge
 sampleDF=merge(sampleDF,colors_species, by.x="species", by.y="species")
 metadataDF=merge(metadataDF,colors_category, by.x="Category", by.y="Category")
@@ -129,9 +130,6 @@ sampleDF=merge(sampleDF,metadataDF[,c("sampleID","Category","Project","colCat")]
 
 # get heatmap
 snpData <- read.csv2(snpmatrix,sep='\t',check.names = F,row.names = 1)
-rownames(snpData)=sapply(strsplit(rownames(snpData),"-"), `[`, 1)
-colnames(snpData)=sapply(strsplit(colnames(snpData),"-"), `[`, 1)
-
 
 # get tree
 treepath <- tree
@@ -152,8 +150,7 @@ generate_ids=function(list_in){
   tmp_list=which( colnames(sampleDF) %ni% list_in ) -1
   return(tmp_list)
 }
-id_nums=generate_ids(c("specimen_id","wgs_id","srr_id",
-                       "wgs_date_put_on_sequencer","auto_qc_outcome"))
+id_nums=generate_ids(c("auto_qc_outcome","specimen_id","wgs_id","srr_id"))
 tax_nums=generate_ids(c("specimen_id","species","sequence_classification",
                         "mlst_1","gamma_beta_lactam_resistance_genes"))
 qc_nums=generate_ids(c("specimen_id","estimated_coverage","genome_length",
@@ -162,16 +159,27 @@ sample_meta=SharedData$new(sampleDF)
 ```
 
 ```{r summarytext, echo=FALSE}
+# generate summary test for outupt
 pass_n=nrow(subset(sampleDF, auto_qc_outcome=="PASS"))
 failed_n=nrow(subset(sampleDF, auto_qc_outcome!="PASS"))
 failed_samples=subset(sampleDF, auto_qc_outcome!="PASS")$specimen_id
-# generate summary test for outupt
 summaryTEXT=paste0("There were ", nrow(sampleDF)," samples analyzed and ",
-                   pass_n, " samples passed quality control thresholds.")
+                   pass_n, " samples passed quality control thresholds, while ",
+                   length(failed_samples)," failed.")
 if(failed_n>0){
-  summaryTEXT=paste0(summaryTEXT," Failing samples included: ",failed_samples)
+  summaryTEXT=paste0(summaryTEXT,
+                     " Failing samples included: ",
+                     paste(failed_samples,collapse=" | "),".")
 }
 ```
+
+```{r referenceTEXT, echo=FALSE}
+reference_samples=subset(sampleDF,Category=="Reference")$specimen_id
+ref_n=length(reference_samples)
+species_id=unique(subset(sampleDF,Category=="Reference")$species)
+referenceTEXT=paste0("Several reference samples, not related to the outbreak, were included for comparison. These samples were randomly chosen from previous AR projects, all belonging to the same suspected species identification (",species_id,"). These (", ref_n,") samples included: ",paste(reference_samples,collapse=" | "), ". They are identified in subsequent data tables and figures.")
+```
+
 
 Information {data-orientation=columns data-icon="fa-info-circle"}
 =================================================================
@@ -180,7 +188,7 @@ Column {data-width=600}
 ### `r subHeaderText` 
 ```{r intro}
 # create table
-colnames(headerDF) <- c("REPORT DATE","PROJECT NAME","PREPARED BY")
+colnames(headerDF) <- c("REPORT DATE","OUTBREAK ID","PROJECT NAME","PREPARED BY")
 
 # plot table
 pander(headerDF)
@@ -192,6 +200,8 @@ Column {data-width=600}
 -----------------------
 ### Summary
 `r summaryTEXT`
+
+`r referenceTEXT`
 
 ### DISCLAIMER
 `r disclaimerTEXT`
@@ -248,11 +258,10 @@ sample_meta %>%
       buttons = list(I("colvis"),"csv","excel")
       ),
     colnames = c(
+      "QC" = "auto_qc_outcome",
       "eLIMS_ID" = "specimen_id",
       "WGS" = "wgs_id",
-      "SRR" = "srr_id",
-      "SeqDate" = "wgs_date_put_on_sequencer",
-      "QC" = "auto_qc_outcome"
+      "SRR" = "srr_id"
     )
   )
 ```
@@ -281,7 +290,6 @@ sample_meta %>%
       "eLIMS_ID" = "specimen_id",
       "Species" = "species",
       "Sequence_Classification" = "sequence_classification",
-      "SeqDate" = "wgs_date_put_on_sequencer",
       "MLST1" = "mlst_1",
       "Beta-lactamase resistant genes" = "gamma_beta_lactam_resistance_genes"
     )
@@ -328,7 +336,7 @@ subset(sampleDF,auto_qc_outcome=="PASS")%>%
 ```{r heatmap}
 collabels=as.data.frame(colnames(snpData))
 colnames(collabels)="specimen_id"
-collabels=merge(collabels,sampleDF[,c("specimen_id","species")])
+collabels=merge(collabels,sampleDF[,c("specimen_id","Category")])
 
 rowlabels=as.data.frame(rownames(snpData))
 colnames(rowlabels)="specimen_id"
@@ -338,17 +346,32 @@ heatmaply(snpData,
           cellnote=snpData,
           cellnote_size=8,
           cellnote_textposition = "middle center",
-          col_side_colors = collabels$species,
-          row_side_colors = rowlabels[,c("species")],
+          col_side_colors = data.frame("Category" = collabels[,c("Category")],
+                                       check.names=FALSE),
+          row_side_colors = data.frame("Species" = rowlabels[,c("species")],
+                                       check.names=FALSE),
           colors = viridis(n = 256, alpha = 1, 
                            begin = 1, end = 0, option = "viridis"),
           show_dendrogram = c(TRUE, FALSE),
           dist_method=config$heat.dist.method, 
           label_names = c("Row", "Column", "SNPs"))
+
 ```
 
 ### Phylogenetic Tree
 ```{r tree, message=FALSE}
+PHYLO_DF<-function(select_col,color_col){
+  #select_col="Category";color_col="colCat"
+  sub_df=subset(sampleDF,auto_qc_outcome=="PASS")
+  d1 <- sub_df[,c("specimen_id","bar",color_col,select_col)]
+  d1$specimen_id=as.character(d1$specimen_id)
+  sorted_labels=as.data.frame(d)[1:nrow(sub_df),]
+  sorted_labels=sorted_labels[rev(order(sorted_labels$y)),]$label
+  d1=d1[match(sorted_labels, d1$specimen_id),]
+  d1$specimen_id=factor(d1$specimen_id,levels=rev(d1$specimen_id))
+  return(d1)
+}
+
 if(exists('treepath')){
   set.seed(42)
   tree <- ape::read.tree(treepath)
@@ -356,8 +379,7 @@ if(exists('treepath')){
     paste("Core Genes Identified: ",cgstats[cgstats$V1 == 'Core genes',3])
     paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])
   }
-  tree$tip.label=sapply(strsplit(tree$tip.label,"-"), `[`, 1)
-  
+
   # set the root method
   if(config$root.method == 'midpoint'){
     tree <- midpoint.root(tree)
@@ -404,18 +426,13 @@ if(exists('treepath')){
   #bs <- bs[bs$label > config$bootstrap.threshold,]
   ggtree_plot <- ggtree_basic + 
     geom_text(data=bs,aes(label=label,hjust=-.4),size=2) + 
-    ggplot2::xlim(0, (tree$Nnode-2))
+    ggplot2::xlim(0, (tree$Nnode+.5))
   ggtree_plot
-  
+
   # create df for bar labels
   sampleDF$bar=1
-  d1 <- sampleDF[,c("specimen_id","bar","colCat","Category")]
-  d1$specimen_id=as.character(d1$specimen_id)
-  sorted_labels=as.data.frame(d)[1:nrow(sampleDF),]
-  sorted_labels=sorted_labels[rev(order(sorted_labels$y)),]$label
-  d1=d1[match(sorted_labels, d1$specimen_id),]
-  d1$specimen_id=factor(d1$specimen_id,levels=rev(d1$specimen_id))
-  p1=ggplot(d1, aes(x =specimen_id, y = bar, fill = Category)) +  
+  phylo_df=PHYLO_DF("Category","colCat")
+  p1=ggplot(phylo_df, aes(x =specimen_id, y = bar, fill = Category)) +  
     geom_bar(stat = "identity") +
     geom_text( aes(label = Category),
                colour = "white", size = 2,y=0.1,hjust=0)+
@@ -425,16 +442,10 @@ if(exists('treepath')){
         axis.ticks.x=element_blank(),axis.title.y=element_blank(),
         axis.text.y=element_blank(),
         axis.ticks.y=element_blank())+
-    theme(legend.position="none")+
-    scale_fill_manual(values=c(rev(d1$colCat)))
+    theme(legend.position="none")
   
-  d1 <- sampleDF[,c("specimen_id","bar","colID","species")]
-  d1$specimen_id=as.character(d1$specimen_id)
-  sorted_labels=as.data.frame(d)[1:nrow(sampleDF),]
-  sorted_labels=sorted_labels[rev(order(sorted_labels$y)),]$label
-  d1=d1[match(sorted_labels, d1$specimen_id),]
-  d1$specimen_id=factor(d1$specimen_id,levels=rev(d1$specimen_id))
-  p2=ggplot(d1, aes(x =specimen_id, y = bar, fill = specimen_id)) +  
+  phylo_df=PHYLO_DF("species","colID")
+  p2=ggplot(phylo_df, aes(x =specimen_id, y = bar, fill = specimen_id)) +  
     geom_bar(stat = "identity") +
     geom_text( aes(label = species),
                colour = "white", size = 2,y=0.1,hjust=0)+
@@ -445,7 +456,7 @@ if(exists('treepath')){
         axis.text.y=element_blank(),
         axis.ticks.y=element_blank())+
     theme(legend.position="none")+
-    scale_fill_manual(values=c(rev(d1$colID)))
+    scale_fill_manual(values=c(rev(phylo_df$colID)))
   ggarrange(ggtree_plot,p1,p2, widths = c(3,1,1),ncol=3)
 }
 ```

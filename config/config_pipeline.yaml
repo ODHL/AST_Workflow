@@ -4,7 +4,7 @@ kraken2_contamination_threshold: 20
 
 # tools
 basespace_cmd: "/home/ubuntu/tools/basespace"
-kraken2_db: "/home/ubuntu/workflows/SARS_CoV_2_Workflow/refs/kraken2db/"
+kraken2_db: "/home/ubuntu/workflows/refs/kraken2db/"
 nextflow_cmd: "/home/ubuntu/tools/nextflow"
 ar_dir: "/home/ubuntu/tools/ar_report_generator"
 
@@ -25,6 +25,7 @@ ARG_ANNOT: "Latest version NT v6 July 2019"
 ResFinder: "v2.1.0 including until 2023-04-12 commit f46d8fc"
 AMRFinder: "v2023-04-17.1"
 MLST: "pulled from from PubMLST.org 2023-05-02"
+config_MetaPhlAn_db: "mpa_vJun23_CHOCOPhlAnSGB_202307"
 
 metadata_file: "METADATAFILE"
 
