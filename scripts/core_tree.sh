@@ -100,7 +100,6 @@ if [[ $flag_prep == "Y" ]]; then
 		
         # if the sample passed QC, assign a WGS ID
         if [[ $check == "PASS" ]]; then
-			echo "pass"
 			# set output dir
 			fq_dest="$tree_dir/input_dir/$sample_id"
 			if [[ ! -d $fq_dest ]]; then mkdir -p $fq_dest; fi
@@ -115,10 +114,9 @@ if [[ $flag_prep == "Y" ]]; then
 			handle_fq $fq_dest $fq2 $trimm_dir
 
 			# add to the samplesheet
-			echo "${sample_id},$gff,$fq1,$fq2" >> $samplesheet
+			echo "${sample_id},$gff,$fq_dest/$fq1,$fq_dest/$fq2" >> $samplesheet
 		fi
 	done
-	cat $samplesheet
 fi
 
 if [[ $flag_analysis == "Y" ]]; then

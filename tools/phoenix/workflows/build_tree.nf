@@ -107,7 +107,8 @@ workflow BUILD_TREE {
 
         // Generate core genome statistics
         ROARY (
-            INPUT_CHECK.out.gffs.collect(), 
+            ch_gff.collect(),
+            params.percent_id
         )
 
         // Generate core genome tree
@@ -115,31 +116,31 @@ workflow BUILD_TREE {
             ROARY.out.aln
         )
 
-        // Make database from mOTUs markers.
-        SAMESTR_DB(
-            params.markers_info1,
-            params.markers_info2,
-            params.marker_fna,
-            params.marker_version
-        )
+        // // Make database from mOTUs markers.
+        // SAMESTR_DB(
+        //     params.markers_info1,
+        //     params.markers_info2,
+        //     params.marker_fna,
+        //     params.marker_version
+        // )
 
-        // align and generate profiles
-        MOTUS(
-            params.db_motu_dir,
-            INPUT_CHECK.out.reads
-        )
+        // // align and generate profiles
+        // MOTUS(
+        //     params.db_motu_dir,
+        //     INPUT_CHECK.out.reads
+        // )
 
-        // sort samfiles
-        SAMTOOLS_SORT(
-            MOTUS.out.bam
-        )
+        // // sort samfiles
+        // SAMTOOLS_SORT(
+        //     MOTUS.out.bam
+        // )
 
-        // Convert sequence alignments to SNV Profiles.
-        SAMESTR_CONVERT(
-            SAMTOOLS_SORT.out.bam,
-            MOTUS.out.profile,
-            SAMESTR_DB.out.samestr_db
-        )
+        // // Convert sequence alignments to SNV Profiles.
+        // SAMESTR_CONVERT(
+        //     SAMTOOLS_SORT.out.bam,
+        //     MOTUS.out.profile,
+        //     SAMESTR_DB.out.samestr_db
+        // )
 
         // // Extract SNV Profiles from Reference Genomes.
         // SAMESTR_EXTRACT(
@@ -184,7 +185,7 @@ workflow BUILD_TREE {
 
     emit:
         valid_samplesheet            = INPUT_CHECK.out.valid_samplesheet
-        bams                         = SAMESTR_CONVERT.out.convert
+        // bams                         = SAMESTR_CONVERT.out.convert
         // distmatrix  = CFSAN.out.distmatrix
         // core_stats  = ROARY.out.core_stats
         // tree        = TREE.out.genome_tree

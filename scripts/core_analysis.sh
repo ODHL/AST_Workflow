@@ -362,6 +362,7 @@ if [[ $flag_post == "Y" ]]; then
 	message_cmd_log "------------------------------------------------------------------------"
 
 	# create tmp copy of results
+	cd $pipeline_dir
 	tmp_file=tmp_output.csv
 	if [[ -f $tmp_file ]]; then rm $tmp_file; fi
 	cp $phoenix_results $tmp_file
