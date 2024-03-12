@@ -30,6 +30,7 @@ kraken2db/
 
 # wgs
 config/sample_ids.txt
+wgs_db/cached*
 
 # ignore large ref files; store on L drive
 tools/phoenix/assets/databases/REFSEQ_20230504_Bacteria_complete.msh.gz
