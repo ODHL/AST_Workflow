@@ -165,7 +165,7 @@ if [[ $flag_basic == "Y" ]]; then
 
     # prepare report
     micropath="L://Micro/WGS/AR WGS/projects/$project_name"
-    prepREPORT $micropath
+    prepREPORT "$micropath"
 
     # run multiQC
 	runMULTIQC

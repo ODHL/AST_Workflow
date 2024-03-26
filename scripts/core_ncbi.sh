@@ -121,7 +121,7 @@ if [[ $flag_manifests == "Y" ]]; then
 			wgsID=`cat $wgs_results | grep $id | awk -F"," '{print $2}'`
 			SID=$(awk -F";" -v sid=$id '{ if ($1 == sid) print NR }' $pipeline_results)
 			organism=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $14}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
-		
+			
 			# grab metadata line
 			meta=`cat $metadataFILE | grep "$id"`
 
@@ -130,7 +130,7 @@ if [[ $flag_manifests == "Y" ]]; then
 				#convert date to ncbi required format - 4/21/81 to 1981-04-21
 				raw_date=`echo $meta | grep -o "[0-9]*/[0-9]*/202[0-9]*"`
 				collection_yr=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[3]}' | tr -d '"'`
-				
+
 				# set title
 				sample_title=`echo "Illumina Sequencing of ${wgsID}"`
 				

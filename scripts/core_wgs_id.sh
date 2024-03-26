@@ -86,13 +86,13 @@ if [[ $flag_ids == "Y" ]]; then
 
                     # add zeros so the final ID is always four digits
                     if [[ $new_id -lt 10 ]]; then
-                        final_id="2023ZN-000$new_id"
+                        final_id="2024ZN-000$new_id"
                     elif [[ $new_id -lt 100 ]]; then
-                        final_id="2023ZN-00$new_id"
+                        final_id="2024ZN-00$new_id"
                     elif [[ $new_id -lt 1000 ]]; then
-                        final_id="2023ZN-0$new_id"
+                        final_id="2024ZN-0$new_id"
                     else
-                        final_id="2023ZN-$new_id"
+                        final_id="2024ZN-$new_id"
                     fi
 
                     # add sample with new ID to list

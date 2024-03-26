@@ -36,7 +36,7 @@ elif [[ $subworkflow == "ALL" ]]; then
 	flag_batch="Y"
 	flag_analysis="Y"
 	flag_post="Y"
-	flag_cleanup="Y"
+	flag_cleanup="N"
 elif [[ $subworkflow == "lala" ]]; then
 	flag_post="Y"
 else
@@ -383,9 +383,8 @@ if [[ $flag_post == "Y" ]]; then
 		num_of_fails=`cat $synopsis | grep -v "completed as FAILED" | grep "FAILED" | wc -l`
 
 		# pull the rowid of results
-		# awk -F";" -v i=$SID 'BEGIN {OFS = FS} NR==i {$2="PASS"}1' $tmp_file > $pipeline_results_clean
 		SID=$(awk -F";" -v sid=$sample_id '{ if ($1 == sid) print NR }' $tmp_file)
-		if [[ $num_of_warnings -gt 2 ]]; then
+		if [[ $num_of_warnings -gt 4 ]]; then
 			reason=$(cat $synopsis | grep -v "Summarized" | grep -E "WARNING|FAIL" | awk -F": " '{print $3}' |  awk 'BEGIN { ORS = "; " } { print }' | sed "s/; ; //g")
 			cat $tmp_file | awk -F";" -v i=$SID -v reason="${reason}" 'BEGIN {OFS = FS} NR==i {$2="FAIL"; $24=reason}1' > $pipeline_results
 		fi

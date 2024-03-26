@@ -158,7 +158,7 @@ elif [[ "$pipeline" == "phaseO" ]]; then
 
         # create outbreak report
         bash run_workflow.sh -p report -n $project_id -s BASIC
-        bash run_workflow.sh -p report -n $project_id -s OUTBREAK -o OB2401
+        bash run_workflow.sh -p report -n $project_id -s OUTBREAK -o $outbreak_id
 
 #############################################################################################
 #############################################################################################
@@ -197,7 +197,7 @@ elif [[ "$pipeline" == "init" ]]; then
 	done
 
 	#update metadata name
-        sed -i "s~METADATAFILE~${log_dir}/manifests/${project_name}_AST_patient_data.csv~" "${log_dir}/config/config_pipeline.yaml"
+        sed -i "s~METADATAFILE~${log_dir}/manifests/${project_name}_AR.csv~" "${log_dir}/config/config_pipeline.yaml"
 
   	#output
         echo "------------------------------------------------------------------------"
@@ -223,6 +223,14 @@ elif [[ "$pipeline" == "analysis" ]]; then
                 "${testing}" \
                 "${pipeline_results}"
 
+################################## Run DBS
+elif [[ "$pipeline" == "dbs" ]]; then
+        bash scripts/core_dbs.sh \
+                "${output_dir}" \
+                "${pipeline_config}" \
+                "${pipeline_log}" \
+                "${resume}" \
+                "${subworkflow}"
 ################################## Run TREE
 elif [[ "$pipeline" == "tree" ]]; then
         bash scripts/core_tree.sh \

@@ -79,10 +79,11 @@ runMULTIQC(){
 
 prepREPORT(){
 	micropath=$1
-    intermedpath="$micropath/analysis/intermed"
-    reportpath="$micropath/analysis/reports"
-    arCONFIG="$micropath/logs/config/config_ar_report.yaml"
+   intermedpath="$micropath/analysis/intermed"
+   reportpath="$micropath/analysis/reports"
+   arCONFIG="$micropath/logs/config/config_ar_report.yaml"
 	metapath="$micropath/metadata.csv"
+   logopath="$micropath/analysis/reports/$config_logo_file"
 	todaysdate=$(date '+%Y-%m-%d')
     sed -i "s~REP_CONFIG~$arCONFIG~g" $arRMD
     sed -i "s/REP_PROJID/$project_name/g" $arRMD
@@ -93,6 +94,6 @@ prepREPORT(){
     sed -i "s~REP_TREE~$intermedpath/core_genome.tree~g" $arRMD
     sed -i "s~REP_CORE~$intermedpath/core_genome_statistics.txt~g" $arRMD
     sed -i "s~REP_AR~$intermedpath/ar_predictions.tsv~g" $arRMD
-    sed -i "s~REP_LOGO~$config_logo_file~g" $arRMD
+    sed -i "s~REP_LOGO~$logopath~g" $arRMD
     sed -i "s~REP_META~$metapath~g" $arRMD
 }

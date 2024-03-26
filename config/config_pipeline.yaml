@@ -4,7 +4,7 @@ kraken2_contamination_threshold: 20
 
 # tools
 basespace_cmd: "/home/ubuntu/tools/basespace"
-kraken2_db: "/home/ubuntu/workflows/refs/kraken2db/"
+kraken2_db: "/home/ubuntu/refs/kraken2db/"
 nextflow_cmd: "/home/ubuntu/tools/nextflow"
 ar_dir: "/home/ubuntu/tools/ar_report_generator"
 
@@ -12,6 +12,7 @@ ar_dir: "/home/ubuntu/tools/ar_report_generator"
 analysis_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/AR_Workflow/tools/phoenix/main.nf"
 analysis_cmd_trailing: "-profile docker -entry PHOENIX_SLIM --max_memory 7.GB --max_cpus 4"
 tree_cmd_trailing: "-profile docker -entry TREE --max_memory 7.GB --max_cpus 4"
+dbs_cmd_trailing: "-profile docker -entry DBS --max_memory 7.GB --max_cpus 4"
 
 # ref files
 ref_fasta: "/home/ubuntu/refs/ASM211692v1.fasta"
@@ -29,7 +30,7 @@ config_MetaPhlAn_db: "mpa_vJun23_CHOCOPhlAnSGB_202307"
 
 metadata_file: "METADATAFILE"
 
-logo_file: "/home/ubuntu/workflows/AR_Workflow/assets/odh_logo_240128.png"
+logo_file: "odh_logo_240128.png"
 
 ###############################
 # PARAMS REQUIRED
