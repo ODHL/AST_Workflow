@@ -68,27 +68,6 @@ workflow PHOENIX {
         ncbi_biosample_sheet = params.create_ncbi_sheet ? PHOENIX_EXTERNAL.out.ncbi_biosample_sheet : null
 }
 
-workflow PHOENIX_SLIM {
-    // Validate input parameters
-    // Check input path parameters to see if they exist
-    def checkPathParamList = [ params.input, params.multiqc_config, params.kraken2db] //removed , params.fasta to stop issue w/connecting to aws and igenomes not used
-    for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
-
-    // Check mandatory parameters
-
-    //input on command line
-    if (params.input) { ch_input = file(params.input) } else { exit 1, 'For entry PHOENIX_SLIM: Input samplesheet not specified!' }
-    ch_versions = Channel.empty() // Used to collect the software versions
-
-    main:
-        PHOENIX_EXTERNAL_SLIM ( ch_input, ch_versions, true )
-    emit:
-        trimmed_reads    = PHOENIX_EXTERNAL_SLIM.out.trimmed_reads
-        gamma_ar         = PHOENIX_EXTERNAL_SLIM.out.gamma_ar
-        summary_report   = PHOENIX_EXTERNAL_SLIM.out.summary_report
-}
-
-
 //
 // WORKFLOW: Run internal version of cdcgov/phoenix analysis pipeline that includes BUSCO, SRST2 and KRAKEN_ASMBLED
 //
