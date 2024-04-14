@@ -95,25 +95,21 @@ if [[ $flag_basic == "Y" ]]; then
     # create final result file    
     for sample_id in "${sample_list[@]}"; do
         sample_id=$(clean_file_names $sample_id)
+        cleanid=`echo $sample_id | cut -f1 -d"-"`
+        
         # check WGS ID, if available
         if [[ -f $wgs_results ]]; then 
             wgs_id=`cat $wgs_results | grep $sample_id | awk -F"," '{print $2}'`
         else
             # outbreak samples will not have WGS run individually - pull projects that ID's were created
-            cleanid=`echo $sample_id | cut -f1 -d"-"`
             wgs_id=`cat wgs_db/wgs_db_master.csv | grep $cleanid | awk -F"," '{print $1}'`
-            if [[ $wgs_id == "" ]]; then
-                wgs_id="NO_ID"
-            fi
+            if [[ $wgs_id == "" ]]; then wgs_id="NO_ID"; fi
         fi
 
         # check NCBI, if available
-        if [[ -f $ncbi_results ]]; then
-            srr_number=`cat $ncbi_results | grep $wgs_id | awk -F"," '{print $2}'`
-        else
-            srr_number="NO_ID"
-        fi
-
+        srr_number=`cat srr_db/srr_db_master.csv | grep $wgs_id | awk -F"," '{print $1}'`
+        if [[ $srr_number == "" ]]; then srr_number="NO_ID"; fi
+        
         # set seq info
         wgs_date_put_on_sequencer=`echo $project_name | cut -f3 -d"-"`
         run_id=$project_name

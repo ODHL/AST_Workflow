@@ -36,7 +36,7 @@ elif [[ $subworkflow == "ALL" ]]; then
 	flag_batch="Y"
 	flag_analysis="Y"
 	flag_post="Y"
-	flag_cleanup="N"
+	flag_cleanup="Y"
 elif [[ $subworkflow == "lala" ]]; then
 	flag_post="Y"
 else

@@ -254,9 +254,12 @@ if [[ "$flag_post" == "Y" ]]; then
 			if [[ $sraID == "" ]]; then sraID="NO_ID"; fi
 
 			# add to final output
+			echo "$sraID,$wgsID,$project_id" >> srr_db/srr_db_tmp.csv
 			echo "$wgsID,$sraID" >> $ncbi_results
 		done
 	done
 
 	head $ncbi_results
+	cp srr_db/srr_db_master.csv srr_db/srr_db_backup.csv
+	mv srr_db/srr_db_tmp.csv srr_db/srr_db_master.csv
 fi

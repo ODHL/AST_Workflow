@@ -134,7 +134,7 @@ if [[ $flag_analysis == "Y" ]]; then
 
     # Run pipeline
     cd $pipeline_dir
-	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --outdir $pipeline_dir --treedir $tree_dir/input_dir --projectID $unique_id --kraken2db $config_kraken2_db"
+	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --percent_id $config_percent_id --input $samplesheet --outdir $pipeline_dir --treedir $tree_dir/input_dir --projectID $unique_id --kraken2db $config_kraken2_db"
 	echo "$pipeline_full_cmd"
 	$pipeline_full_cmd
 

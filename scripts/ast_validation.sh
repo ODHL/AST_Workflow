@@ -1,108 +1,67 @@
 #########################################################
 # ARGS
 #########################################################
-subworkflow=$1
-project_name_full=$2
-output_dir=$3
-pipeline_config=$4
+pipeline_test="/home/ubuntu/workflows/phoenix_rewrite/phoenix"
+project_id="validation-project"
 
 #########################################################
 # Pipeline controls
 ########################################################
-# set flags
-flag_report="N"
-flag_mqc="N"
-
-if [[ $subworkflow == "REPORT" ]]; then
-	flag_report="Y"
-elif [[ $subworkflow == "MQC" ]]; then
-	flag_mqc="Y"
-elif [[ $subworkflow == "ALL" ]]; then
-    flag_report="Y"
-    flag_mqc="Y"
-fi
+flag_analysis="Y"
 
 #########################################################
 # Set dirs, files, args
 #########################################################
-# pipeline raw output
-pipeline_dir=$output_dir/pipeline
+pipeline_core="/home/ubuntu/workflows/AR_Workflow/"
+output_dir="/home/ubuntu/output/$project_id"
 
-# logdir
-log_dir=$output_dir/logs
-
-## final analysis output
-analysis_dir=$output_dir/analysis
-
-# qc dir
-mqc_dir=$analysis_dir/qc/data
-
-# serach dir
-val_dir=$analysis_dir/intermed/val
-
-# results files
-pipeline_results=$analysis_dir/intermed/pipeline_results.tsv
-date_check="240125"
-gamma_results="$analysis_dir/intermed/gamma_results_$date_check.csv"
-kraken_results="$analysis_dir/intermed/kraken_results_$date_check.txt"
-val_results="$analysis_dir/reports/val_results_$date_check.txt"
-
-multiqc_config="$output_dir/logs/config/config_multiqc.yaml"
-multiqc_log="$output_dir/logs/log_multiqc.txt"
-
-# set project shorthand
-project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
 ##########################################################
 # Eval, source
 #########################################################
-source /home/ubuntu/workflows/AR_Workflow/scripts/core_functions.sh
-eval $(parse_yaml ${pipeline_config} "config_")
-
-if [[ $flag_report == "Y" ]]; then
-	echo "--running report"
-	# prep file
-	if [ -f $gamma_results ]; then rm $gamma_results; fi
-	if [ -f $kraken_results ]; then rm $kraken_results; fi
-	if [ -f $val_results ]; then rm $val_results; fi
-
-	# for each file print name of file and all genes
-	for f in $val_dir/*.gamma; do
-		id=`echo $f | cut -f9 -d"/" | sed "s/_ResGANNCBI_20230517_srst2.gamma//g"`
-		line=`awk '{print $1}' $f | sort | uniq | awk '{printf "%s%s",sep,$1; sep=","} END{print ""}' | sed "s/,Gene//g"`
-		echo "$id,$line" >> $gamma_results
-	done
-
-	# get the taxonomic ID
-	awk -F";" '{ print $1","$2","$13 }' $pipeline_results | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/ /_/g" > tmp_kraken
-
-	# cleanup gamma
-	sed -i "s/-//g" $gamma_results
-
-	# cleanup kraken
-	cat tmp_kraken | sort | uniq > $kraken_results
-	rm tmp_kraken
-
-	# review
-	# head $gamma_results
-	# cat $kraken_results
-
-	# merge
-	join <(sort $kraken_results) <(sort $gamma_results) -t $',' > $val_results
+if [[ $flag_analysis == "Y" ]]; then
 	
-	# clean fail
-	sed -i "s/FAIL/Failed_QC/g" $val_results
+	# init
+    if [[ ! -d $output_dir ]]; then
+		echo "--init"
+	    cd $pipeline_core
+		bash $pipeline_core/run_workflow.sh -n $project_id -p init
+		cp $pipeline_core/test/sample_ids.txt $pipeline_core/config/sample_ids.txt
+	fi
+    	
+	# pull SRR samples
+    if [[ ! -d $output_dir/tmp/rawdata/srr ]]; then
+		echo "--SRR"
+		cd $pipeline_core
+		bash $pipeline_core/scripts/downloadSRR.sh $output_dir
+	fi
+    
+	# batch samples
+    if [[ ! -d $output_dir/tmp/rawdata/srr ]]; then
+	    echo "--batch"
+		cd $pipeline_core
+		bash $pipeline_core/run_workflow.sh -n $project_id -p analysis -s BATCH
+	fi
 
-	# review
-	cat $val_results
-	cat $val_results | wc -l
-fi
+	# corrupt sample
+	R1="/home/ubuntu/output/validation-project/tmp/rawdata/fastq/SRR5168512c.R1.fastq.gz"
+	if [[ ! -f $R1 ]]; then
+		echo "--corrupting"
+		head -n -1 /home/ubuntu/output/validation-project/tmp/rawdata/fastq/SRR5168512.R1.fastq.gz > temp.txt 
+		mv temp.txt $R1
 
-if [[ $flag_mqc == "Y" ]]; then
-	# run multiQC
-	## -d -dd 1 adds dir name to sample name
-	multiqc -f -v \
-	-c $multiqc_config \
-	$mqc_dir \
-	$val_dir \
-	-o $analysis_dir/qc/ 2>&1 | tee -a $multiqc_log
+		R2="/home/ubuntu/output/validation-project/tmp/rawdata/fastq/SRR5168512c.R2.fastq.gz"
+		cp /home/ubuntu/output/validation-project/tmp/rawdata/fastq/SRR5168512.R2.fastq.gz $R2		
+		
+		echo "SRR21590951c,$R1,$R2" >> $output_dir/logs/manifests/samplesheet_01.csv
+	fi
+
+	# run analysis
+	# rm -rf /home/ubuntu/workflows/AR_Workflow/scripts/work
+	cmd="/home/ubuntu/tools/nextflow run $pipeline_test/main.nf -resume \
+		-profile docker -entry PHOENIX --max_memory 7.GB --max_cpus 4 \
+		--input $output_dir/logs/manifests/samplesheet_01.csv \
+		--kraken2db /home/ubuntu/refs/kraken2db/ \
+		--outdir $output_dir/tmp/pipeline/batch_01 --projectID $project_id"
+	echo $cmd
+	$cmd
 fi
