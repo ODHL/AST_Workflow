@@ -9,17 +9,12 @@ process CORRUPTION_CHECK {
     val(busco_val)
 
     output:
-    tuple val(meta), path('*_summary.txt'),                    emit: outcome
-    tuple val(meta), path('*_summary_old.txt'),                emit: outcome_to_edit
+    tuple val(meta), path('*_summary_fairy.txt'),                    emit: outcome
     path('*_summaryline.tsv'),                  optional:true, emit: summary_line
     tuple val(meta), path('*.synopsis'),        optional:true, emit: synopsis
     path("versions.yml"),                                      emit: versions
 
     script:
-    // Adding if/else for if running on ICA it is a requirement to state where the script is, however, this causes CLI users to not run the pipeline from any directory.
-    if (params.ica==false) { ica = "" } 
-    else if (params.ica==true) { ica = "bash ${workflow.launchDir}/bin/" }
-    else { error "Please set params.ica to either \"true\" if running on ICA or \"false\" for all other methods." }
     // define variables
     def prefix = task.ext.prefix ?: "${meta.id}"
     def num1 = "${reads[0]}".minus(".fastq.gz")
@@ -27,17 +22,18 @@ process CORRUPTION_CHECK {
     def busco_parameter = busco_val ? "-b" : ""
     def container_version = "base_v2.1.0"
     def container = task.container.toString() - "quay.io/jvhagey/phoenix@"
-    """
+    def script = params.ica ? "python ${params.ica_path}/fairy_proc.sh" : "fairy_proc.sh"
+"""
     #set +e
     #check for file integrity and log errors
     #if there is a corruption problem the script will create a *_summaryline.tsv and *.synopsis file for the sample.
-    ${ica}fairy_proc.sh -f ${reads[0]} -p ${prefix} -r forward ${busco_parameter} 
-    ${ica}fairy_proc.sh -f ${reads[1]} -p ${prefix} -r reverse ${busco_parameter} 
+    ${script} -r ${reads[0]} -p ${prefix} ${busco_parameter}
+    ${script} -r ${reads[1]} -p ${prefix} ${busco_parameter}
 
-    script_version=\$(${ica}fairy_proc.sh -V)
+    script_version=\$(${script} -V)
 
     #making a copy of the summary file to pass to READ_COUNT_CHECKS to handle file names being the same
-    cp ${prefix}_summary.txt ${prefix}_summary_old.txt
+    mv ${prefix}_summary.txt ${prefix}_summary_fairy.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

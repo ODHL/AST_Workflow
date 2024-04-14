@@ -20,82 +20,22 @@ WorkflowMain.initialise(workflow, params, log)
 
 //Check coverage is above its threshold
 if (params.coverage < 30) { exit 1, 'The minimum coverage allowed for QA/QC purposes is 30 and is the default. Please choose a value >=30.' }
+//Check path of kraken2db
+if (params.kraken2db == null) { exit 1, 'Input path to kraken2db not specified!' }
+
 /*
 ========================================================================================
     NAMED WORKFLOW FOR PIPELINE
 ========================================================================================
 */
-
-include { PHOENIX_EXTERNAL_SLIM     } from './workflows/phoenix_slim'
-include { BUILD_DBS                 } from './workflows/build_dbs'
 include { BUILD_TREE                } from './workflows/build_tree'
-include { PHOENIX_EXTERNAL          } from './workflows/phoenix'
-include { PHOENIX_EXQC              } from './workflows/cdc_phoenix'
-include { SCAFFOLDS_EXTERNAL        } from './workflows/scaffolds'
-include { SCAFFOLDS_EXQC            } from './workflows/cdc_scaffolds'
-include { SRA_PREP                  } from './workflows/sra_prep'
+include { PHOENIX_ODHL_EX           } from './workflows/phoenix_odhl'
+include { PHOENIX_EXTERNAL       } from './workflows/phoenix'
+include { PHOENIX_EXQC           } from './workflows/cdc_phoenix'
+include { SCAFFOLDS_EXTERNAL     } from './workflows/scaffolds'
+include { SCAFFOLDS_EXQC         } from './workflows/cdc_scaffolds'
+include { SRA_PREP               } from './workflows/sra_prep'
 
-/*
-========================================================================================
-    RUN ODH WORKFLOWS
-========================================================================================
-*/
-workflow PHOENIX_SLIM {
-    //Check path of kraken2db
-    if (params.kraken2db == null) { exit 1, 'Input path to kraken2db not specified!' }
-
-    // Validate input parameters
-    // Check input path parameters to see if they exist
-    def checkPathParamList = [ params.input, params.multiqc_config, params.kraken2db] //removed , params.fasta to stop issue w/connecting to aws and igenomes not used
-    for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
-
-    // Check mandatory parameters
-
-    //input on command line
-    if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry PHOENIX: Input samplesheet not specified!' }
-    ch_versions = Channel.empty() // Used to collect the software versions
-
-    main:
-        PHOENIX_EXTERNAL_SLIM ( ch_input, ch_versions, true )
-}
-
-
-//
-// WORKFLOW: Create DB's for outbreak analysis
-//
-workflow DBS {
-
-    main:
-        BUILD_DBS ( params.db_loc )
-
-    emit:
-        samestr_db   = BUILD_DBS.out.samestr_db
-        samestr_ext  = BUILD_DBS.out.samestr_ext
-}
-
-
-//
-// WORKFLOW: Phylo analysis
-//
-workflow TREE {
-    if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry PHOENIX: Input samplesheet not specified!' }
-
-    main:
-        BUILD_TREE ( ch_input )
-
-    emit:
-        valid_samplesheet            = BUILD_TREE.out.valid_samplesheet
-        distmatrix                   = BUILD_TREE.out.distmatrix
-        core_stats  = BUILD_TREE.out.core_stats
-        tree        = BUILD_TREE.out.tree
-}
-
-
-/*
-========================================================================================
-    RUN SRA WORKFLOWS
-========================================================================================
-*/
 //
 // WORKFLOW: Run main cdcgov/phoenix analysis pipeline
 //
@@ -104,15 +44,15 @@ workflow PHOENIX {
     // Check input path parameters to see if they exist
     def checkPathParamList = [ params.input, params.multiqc_config, params.kraken2db] //removed , params.fasta to stop issue w/connecting to aws and igenomes not used
     for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
-
-    // Check mandatory parameters
+    if (params.ica != true && params.ica != false) {exit 1, "Please set params.ica to either \"true\" if running on ICA or \"false\" for all other methods."}
+    if (params.terra != true && params.terra != false) {exit 1, "Please set params.terra to either \"true\" if running on terra or \"false\" for all other methods."}
 
     //input on command line
     if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry PHOENIX: Input samplesheet not specified!' }
     ch_versions = Channel.empty() // Used to collect the software versions
-
+    
     main:
-        PHOENIX_EXTERNAL ( ch_input, ch_versions, true )
+        PHOENIX_EXTERNAL ( ch_input, ch_versions, params.ncbi_excel_creation )
     emit:
         scaffolds        = PHOENIX_EXTERNAL.out.scaffolds
         trimmed_reads    = PHOENIX_EXTERNAL.out.trimmed_reads
@@ -129,10 +69,57 @@ workflow PHOENIX {
         ncbi_biosample_sheet = params.create_ncbi_sheet ? PHOENIX_EXTERNAL.out.ncbi_biosample_sheet : null
 }
 
+workflow PHOENIX_ODHL {
+    // Validate input parameters
+    // Check input path parameters to see if they exist
+    def checkPathParamList = [ params.input, params.multiqc_config, params.kraken2db] //removed , params.fasta to stop issue w/connecting to aws and igenomes not used
+    for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
+    if (params.ica != true && params.ica != false) {exit 1, "Please set params.ica to either \"true\" if running on ICA or \"false\" for all other methods."}
+    if (params.terra != true && params.terra != false) {exit 1, "Please set params.terra to either \"true\" if running on terra or \"false\" for all other methods."}
+
+    //input on command line
+    if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry PHOENIX: Input samplesheet not specified!' }
+    ch_versions = Channel.empty() // Used to collect the software versions
+    
+    main:
+        PHOENIX_ODHL_EX ( ch_input, ch_versions, params.ncbi_excel_creation )
+    emit:
+        scaffolds        = PHOENIX_ODHL_EX.out.scaffolds
+        trimmed_reads    = PHOENIX_ODHL_EX.out.trimmed_reads
+        mlst             = PHOENIX_ODHL_EX.out.mlst
+        amrfinder_output = PHOENIX_ODHL_EX.out.amrfinder_output
+        gamma_ar         = PHOENIX_ODHL_EX.out.gamma_ar
+        phx_summary      = PHOENIX_ODHL_EX.out.phx_summary
+        //output for phylophoenix
+        griphin_tsv      = params.run_griphin ? PHOENIX_ODHL_EX.out.griphin_tsv : null
+        griphin_excel    = params.run_griphin ? PHOENIX_ODHL_EX.out.griphin_excel : null
+        dir_samplesheet  = params.run_griphin ? PHOENIX_ODHL_EX.out.dir_samplesheet : null
+        //output for ncbi upload 
+        ncbi_sra_sheet       = params.create_ncbi_sheet ? PHOENIX_ODHL_EX.out.ncbi_sra_sheet : null
+        ncbi_biosample_sheet = params.create_ncbi_sheet ? PHOENIX_ODHL_EX.out.ncbi_biosample_sheet : null
+}
+
+//
+// WORKFLOW: Create tree for inputs
+//
+workflow TREE {
+    if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry PHOENIX: Input samplesheet not specified!' }
+
+    main:
+        BUILD_TREE ( ch_input )
+
+    emit:
+        valid_samplesheet            = BUILD_TREE.out.valid_samplesheet
+        // bams                         = BUILD_TREE.out.bams
+        // distmatrix                   = BUILD_TREE.out.distmatrix
+        // core_stats  = BUILD_TREE.out.core_stats
+        // tree        = BUILD_TREE.out.tree
+        // samestr_db  = BUILD_TREE.out.samestr_db
+}
+
 //
 // WORKFLOW: Run internal version of cdcgov/phoenix analysis pipeline that includes BUSCO, SRST2 and KRAKEN_ASMBLED
 //
-
 workflow CDC_PHOENIX {
     // Validate input parameters
     // Check input path parameters to see if they exist
@@ -144,6 +131,9 @@ workflow CDC_PHOENIX {
     //input on command line
     if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry CDC_PHOENIX: Input samplesheet not specified!' }
     ch_versions = Channel.empty() // Used to collect the software versions
+
+    // true is for -entry CDC_PHOENIX and CDC_SCAFFOLDS - used in SPADES
+    extended_qc=false
 
     main:
         PHOENIX_EXQC ( ch_input, ch_versions, true )

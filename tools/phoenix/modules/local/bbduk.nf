@@ -13,10 +13,6 @@ process BBDUK {
     tuple val(meta), path('*.log')     , emit: log
     path "versions.yml"                , emit: versions
 
-    when:
-    //if the files are not corrupt and there are equal number of reads in each file then run bbduk
-    "${fairy_outcome[0]}" == "PASSED: File ${meta.id}_R1 is not corrupt." && "${fairy_outcome[1]}" == "PASSED: File ${meta.id}_R2 is not corrupt." && "${fairy_outcome[2]}" == "PASSED: Read pairs for ${meta.id} are equal."
-
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
@@ -26,7 +22,7 @@ process BBDUK {
     def maxmem = task.memory.toGiga()-(task.attempt*12) // keep heap mem low so and rest of mem is for java expansion.
     def container = task.container.toString() - "staphb/bbtools@"
     """
-    maxmem=\$(echo \"$maxmem GB\"| sed 's/ GB/g/g')
+    maxmem=\$(echo \"$maxmem GB\"| sed 's/ GB/g/g' | sed 's/-//g')
     bbduk.sh \\
         -Xmx\$maxmem \\
         $raw \\

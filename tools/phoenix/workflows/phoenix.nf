@@ -113,7 +113,7 @@ workflow PHOENIX_EXTERNAL {
         )
         ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
 
-        //unzip any zipped databases
+        // unzip any zipped databases
         ASSET_CHECK (
             params.zipped_sketch, params.custom_mlstdb, kraken2_db_path
         )
@@ -121,23 +121,29 @@ workflow PHOENIX_EXTERNAL {
 
         //fairy compressed file corruption check & generate read stats
         CORRUPTION_CHECK (
-            INPUT_CHECK.out.reads, false // true says busco is being run in this workflow
+            INPUT_CHECK.out.reads, params.run_busco
         )
         ch_versions = ch_versions.mix(CORRUPTION_CHECK.out.versions)
 
         //Combining reads with output of corruption check. By=2 is for getting R1 and R2 results
         //The mapping here is just to get things in the right bracket so we can call var[0]
-        read_stats_ch = INPUT_CHECK.out.reads.join(CORRUPTION_CHECK.out.outcome_to_edit, by: [0,0])
-        .join(CORRUPTION_CHECK.out.outcome.splitCsv(strip:true, by:2).map{meta, fairy_outcome -> [meta, [fairy_outcome[0][0], fairy_outcome[1][0]]]}, by: [0,0])
+        read_stats_ch = INPUT_CHECK.out.reads
+            .join(CORRUPTION_CHECK.out.outcome, by: [0,0])
+            .join(CORRUPTION_CHECK.out.outcome.splitCsv(strip:true, by:2)
+            .map{meta, fairy_outcome -> [meta, [fairy_outcome[0][0], fairy_outcome[1][0]]]}, by: [0,0])
+            .filter { it[3].findAll {!it.contains('FAILED')}}
 
-        //Get stats on raw reads if the reads aren't corrupted
+        // Get stats on raw reads if the reads aren't corrupted
         GET_RAW_STATS (
-            read_stats_ch, false // false says no busco is being run
+            read_stats_ch, params.run_busco // false says no busco is being run
         )
         ch_versions = ch_versions.mix(GET_RAW_STATS.out.versions)
 
         // Combining reads with output of corruption check
-        bbduk_ch = INPUT_CHECK.out.reads.join(GET_RAW_STATS.out.outcome.splitCsv(strip:true, by:3).map{meta, fairy_outcome -> [meta, [fairy_outcome[0][0], fairy_outcome[1][0], fairy_outcome[2][0]]]}, by: [0,0])
+        bbduk_ch = INPUT_CHECK.out.reads
+            .join(GET_RAW_STATS.out.outcome.splitCsv(strip:true, by:3)
+            .map{meta, fairy_outcome -> [meta, [fairy_outcome[0][0], fairy_outcome[1][0], fairy_outcome[2][0]]]}, by: [0,0])
+            .filter { it[2].findAll {!it.contains('FAILED')}}
 
         // Remove PhiX reads
         BBDUK (
@@ -147,7 +153,7 @@ workflow PHOENIX_EXTERNAL {
 
         // Trim and remove low quality reads
         FASTP_TRIMD (
-            BBDUK.out.reads, true, false
+            BBDUK.out.reads, params.save_trimmed_fail, params.save_merged
         )
         ch_versions = ch_versions.mix(FASTP_TRIMD.out.versions)
 
@@ -160,16 +166,19 @@ workflow PHOENIX_EXTERNAL {
         // Combining fastp json outputs based on meta.id
         fastp_json_ch = FASTP_TRIMD.out.json.join(FASTP_SINGLES.out.json, by: [0,0])\
         .join(GET_RAW_STATS.out.combined_raw_stats, by: [0,0])\
-        .join(GET_RAW_STATS.out.outcome_to_edit, by: [0,0])
+        .join(GET_RAW_STATS.out.outcome, by: [0,0])
 
         // Script gathers data from fastp jsons for pipeline stats file
         GET_TRIMD_STATS (
-            fastp_json_ch, false // false says no busco is being run
+            fastp_json_ch, params.run_busco // false says no busco is being run
         )
         ch_versions = ch_versions.mix(GET_TRIMD_STATS.out.versions)
 
         // combing fastp_trimd information with fairy check of reads to confirm there are reads after filtering
-        trimd_reads_file_integrity_ch = FASTP_TRIMD.out.reads.join(GET_TRIMD_STATS.out.outcome.splitCsv(strip:true, by:5).map{meta, fairy_outcome -> [meta, [fairy_outcome[0][0], fairy_outcome[1][0], fairy_outcome[2][0], fairy_outcome[3][0], fairy_outcome[4][0]]]}, by: [0,0])
+        trimd_reads_file_integrity_ch = FASTP_TRIMD.out.reads
+            .join(GET_TRIMD_STATS.out.outcome.splitCsv(strip:true, by:5)
+            .map{meta, fairy_outcome -> [meta, [fairy_outcome[0][0], fairy_outcome[1][0], fairy_outcome[2][0], fairy_outcome[3][0], fairy_outcome[4][0]]]}, by: [0,0])
+            .filter { it[2].findAll {!it.contains('FAILED')}}
 
         // Running Fastqc on trimmed reads
         FASTQCTRIMD (
@@ -192,7 +201,7 @@ workflow PHOENIX_EXTERNAL {
             KRAKEN2_TRIMD.out.report, \
             KRAKEN2_TRIMD.out.krona_html, \
             KRAKEN2_TRIMD.out.k2_bh_summary, \
-            false
+            params.extended_qc
         )
         ch_versions = ch_versions.mix(SPADES_WF.out.versions)
 
@@ -209,24 +218,26 @@ workflow PHOENIX_EXTERNAL {
         ch_versions = ch_versions.mix(BBMAP_REFORMAT.out.versions)
 
         // Combine bbmap log with the fairy outcome file
-        scaffold_check_ch = BBMAP_REFORMAT.out.log.map{meta, log                -> [[id:meta.id], log]}\
-        .join(GET_TRIMD_STATS.out.outcome_to_edit.map{   meta, outcome_to_edit  -> [[id:meta.id], outcome_to_edit]},    by: [0])\
-        .join(GET_RAW_STATS.out.combined_raw_stats.map{meta, combined_raw_stats -> [[id:meta.id], combined_raw_stats]}, by: [0])\
-        .join(GET_TRIMD_STATS.out.fastp_total_qc.map{  meta, fastp_total_qc     -> [[id:meta.id], fastp_total_qc]},     by: [0])\
-        .join(KRAKEN2_TRIMD.out.report.map{            meta, report             -> [[id:meta.id], report]},             by: [0])\
-        .join(KRAKEN2_TRIMD.out.k2_bh_summary.map{     meta, k2_bh_summary      -> [[id:meta.id], k2_bh_summary]},      by: [0])\
-        .join(KRAKEN2_TRIMD.out.krona_html.map{        meta, krona_html         -> [[id:meta.id], krona_html]},         by: [0])
+        scaffold_check_ch = BBMAP_REFORMAT.out.log.map{      meta, log                -> [[id:meta.id], log]}\
+        .join(GET_TRIMD_STATS.out.outcome.map{               meta, outcome            -> [[id:meta.id], outcome]},    by: [0])\
+        .join(GET_RAW_STATS.out.combined_raw_stats.map{      meta, combined_raw_stats -> [[id:meta.id], combined_raw_stats]}, by: [0])\
+        .join(GET_TRIMD_STATS.out.fastp_total_qc.map{        meta, fastp_total_qc     -> [[id:meta.id], fastp_total_qc]},     by: [0])\
+        .join(KRAKEN2_TRIMD.out.report.map{                  meta, report             -> [[id:meta.id], report]},             by: [0])\
+        .join(KRAKEN2_TRIMD.out.k2_bh_summary.map{           meta, k2_bh_summary      -> [[id:meta.id], k2_bh_summary]},      by: [0])\
+        .join(KRAKEN2_TRIMD.out.krona_html.map{              meta, krona_html         -> [[id:meta.id], krona_html]},         by: [0])
 
         // Checking that there are still scaffolds left after filtering
         SCAFFOLD_COUNT_CHECK (
-            scaffold_check_ch, false, params.coverage, params.nodes, params.names
+            scaffold_check_ch, params.extended_qc, params.coverage, params.nodes, params.names
         )
         ch_versions = ch_versions.mix(SCAFFOLD_COUNT_CHECK.out.versions)
 
         //combing scaffolds with scaffold check information to ensure processes that need scaffolds only run when there are scaffolds in the file
         filtered_scaffolds_ch = BBMAP_REFORMAT.out.filtered_scaffolds.map{    meta, filtered_scaffolds -> [[id:meta.id], filtered_scaffolds]}
-        .join(SCAFFOLD_COUNT_CHECK.out.outcome.splitCsv(strip:true, by:5).map{meta, fairy_outcome      -> [meta, [fairy_outcome[0][0], fairy_outcome[1][0], fairy_outcome[2][0], fairy_outcome[3][0], fairy_outcome[4][0]]]}, by: [0])
-
+            .join(SCAFFOLD_COUNT_CHECK.out.outcome.splitCsv(strip:true, by:5)
+            .map{meta, fairy_outcome      -> [meta, [fairy_outcome[0][0], fairy_outcome[1][0], fairy_outcome[2][0], fairy_outcome[3][0], fairy_outcome[4][0]]]}, by: [0])
+            .filter { it[2].findAll {it.contains('PASSED: More than 0 scaffolds')}}
+        
         // Running gamma to identify hypervirulence genes in scaffolds
         GAMMA_HV (
             filtered_scaffolds_ch, params.hvgamdb
@@ -249,6 +260,12 @@ workflow PHOENIX_EXTERNAL {
             filtered_scaffolds_ch
         )
         ch_versions = ch_versions.mix(QUAST.out.versions)
+
+        // get gff and protein files for amrfinder+
+        PROKKA (
+            filtered_scaffolds_ch, [], []
+        )
+        ch_versions = ch_versions.mix(PROKKA.out.versions)
 
         // Creating krona plots and best hit files for weighted assembly
         KRAKEN2_WTASMBLD (
@@ -309,15 +326,9 @@ workflow PHOENIX_EXTERNAL {
             FASTP_TRIMD.out.reads, \
             DETERMINE_TAXA_ID.out.taxonomy, \
             ASSET_CHECK.out.mlst_db, \
-            false
+            params.run_srst2_mlst
         )
         ch_versions = ch_versions.mix(DO_MLST.out.versions)
-
-        // get gff and protein files for amrfinder+
-        PROKKA (
-            filtered_scaffolds_ch, [], []
-        )
-        ch_versions = ch_versions.mix(PROKKA.out.versions)
 
         /*// Fetch AMRFinder Database
         AMRFINDERPLUS_UPDATE( )
@@ -351,10 +362,26 @@ workflow PHOENIX_EXTERNAL {
         )
         ch_versions = ch_versions.mix(CALCULATE_ASSEMBLY_RATIO.out.versions)
 
+        // prepare inputs to the stats wf
+        if (params.run_srst2_mlst){
+            fullgene_results=SRST2_TRIMD_AR.out.fullgene_results
+        } else {
+            fullgene_results=[]
+        }
+        if (params.asmbld){
+            asmbld_report=KRAKEN2_ASMBLD.out.report                 // channel: tuple (meta) path(report)
+            asmbld_krona_html=KRAKEN2_ASMBLD.out.krona_html         // channel: tuple (meta) path(krona_html)
+            asmbld_k2_bh_summary=KRAKEN2_ASMBLD.out.k2_bh_summary   // channel: tuple (meta) path(k2_bh_summary)
+        } else{
+            asmbld_report=[]
+            asmbld_krona_html=[]
+            asmbld_k2_bh_summary=[]
+        }
+
         GENERATE_PIPELINE_STATS_WF (
             GET_RAW_STATS.out.combined_raw_stats, \
             GET_TRIMD_STATS.out.fastp_total_qc, \
-            [], \
+            fullgene_results, \
             KRAKEN2_TRIMD.out.report, \
             KRAKEN2_TRIMD.out.krona_html, \
             KRAKEN2_TRIMD.out.k2_bh_summary, \
@@ -365,7 +392,7 @@ workflow PHOENIX_EXTERNAL {
             GAMMA_AR.out.gamma, \
             GAMMA_PF.out.gamma, \
             QUAST.out.report_tsv, \
-            [], [], [], [], \
+            params.run_busco, asmbld_report, asmbld_krona_html, asmbld_k2_bh_summary, \
             KRAKEN2_WTASMBLD.out.report, \
             KRAKEN2_WTASMBLD.out.krona_html, \
             KRAKEN2_WTASMBLD.out.k2_bh_summary, \
@@ -374,9 +401,9 @@ workflow PHOENIX_EXTERNAL {
             CALCULATE_ASSEMBLY_RATIO.out.ratio, \
             AMRFINDERPLUS_RUN.out.mutation_report, \
             CALCULATE_ASSEMBLY_RATIO.out.gc_content, \
-            false
+            params.extended_qc
         )
-        ch_versions = ch_versions.mix(GENERATE_PIPELINE_STATS_WF.out.versions)
+        ch_versions = ch_versions.mix(GENERATE_PIPELINE_STATS_WF.out.versions) 
 
         // Combining output based on meta.id to create summary by sample -- is this verbose, ugly and annoying? yes, if anyone has a slicker way to do this we welcome the input.
         line_summary_ch = GET_TRIMD_STATS.out.fastp_total_qc.map{meta, fastp_total_qc  -> [[id:meta.id], fastp_total_qc]}\
@@ -412,81 +439,96 @@ workflow PHOENIX_EXTERNAL {
         // combine all line summaries into one channel
         spades_failure_summaries_ch = FETCH_FAILED_SUMMARIES.out.spades_failure_summary_line
         fairy_summary_ch = CORRUPTION_CHECK.out.summary_line.collect().ifEmpty( [] )\
-        .combine(GET_RAW_STATS.out.summary_line.collect().ifEmpty( [] ))\
-        .combine(GET_TRIMD_STATS.out.summary_line.collect().ifEmpty( [] ))\
-        .combine(SCAFFOLD_COUNT_CHECK.out.summary_line.collect().ifEmpty( [] ))\
-        .ifEmpty( [] )
+            .combine(GET_RAW_STATS.out.summary_line.collect().ifEmpty( [] ))\
+            .combine(GET_TRIMD_STATS.out.summary_line.collect().ifEmpty( [] ))\
+            .combine(SCAFFOLD_COUNT_CHECK.out.summary_line.collect().ifEmpty( [] ))\
+            .ifEmpty( [] )
 
         // pulling it all together
-        all_summaries_ch = spades_failure_summaries_ch.combine(failed_summaries_ch).combine(summaries_ch).combine(fairy_summary_ch)
+        all_summaries_ch = spades_failure_summaries_ch
+            .combine(failed_summaries_ch)
+            .combine(summaries_ch)
+            .combine(fairy_summary_ch)
 
-        // Combining sample summaries into final report
-        GATHER_SUMMARY_LINES (
-            all_summaries_ch, outdir_path, false
-        )
-        ch_versions = ch_versions.mix(GATHER_SUMMARY_LINES.out.versions)
+        // // Combining sample summaries into final report
+        // GATHER_SUMMARY_LINES (
+        //     all_summaries_ch, params.run_busco
+        // )
+        // ch_versions = ch_versions.mix(GATHER_SUMMARY_LINES.out.versions)
 
-        //create GRiPHin report
-        GRIPHIN (
-            all_summaries_ch, INPUT_CHECK.out.valid_samplesheet, params.ardb, outdir_path, params.coverage, true, false
-        )
-        ch_versions = ch_versions.mix(GRIPHIN.out.versions)
+        // //create GRiPHin report
+        // if(params.run_griphin) {
+        //     GRIPHIN (
+        //         all_summaries_ch, INPUT_CHECK.out.valid_samplesheet, params.ardb, outdir_path, params.coverage, true, false
+        //     )
+        //     ch_versions = ch_versions.mix(GRIPHIN.out.versions)
+        // }
+        
+        // // Create NCBI sheet
+        // if (params.ncbi_excel_creation == true && params.create_ncbi_sheet == true) {
+        //     // requiring files so that this process doesn't start until needed files are made. 
+        //     required_files_ch = FASTP_TRIMD.out.reads
+        //         .map{ meta, reads -> reads[0]}
+        //         .collect()
+        //         .combine(DO_MLST.out.checked_MLSTs
+        //             .map{ meta, checked_MLSTs -> checked_MLSTs}
+        //             .collect())
+        //         .combine(DETERMINE_TAXA_ID.out.taxonomy
+        //         .map{ meta, taxonomy -> taxonomy}.collect())
 
-        if (ncbi_excel_creation == true && params.create_ncbi_sheet == true) {
-            // requiring files so that this process doesn't start until needed files are made. 
-            required_files_ch = FASTP_TRIMD.out.reads.map{ meta, reads -> reads[0]}.collect().combine(DO_MLST.out.checked_MLSTs.map{ meta, checked_MLSTs -> checked_MLSTs}.collect()).combine(DETERMINE_TAXA_ID.out.taxonomy.map{ meta, taxonomy -> taxonomy}.collect())
+        //     //Fill out NCBI excel sheets for upload based on what PHX found
+        //     CREATE_NCBI_UPLOAD_SHEET (
+        //         required_files_ch, params.microbe_example, params.sra_metadata, params.osii_bioprojects, outdir_path, GRIPHIN.out.griphin_tsv_report
+        //     )
+        //     ch_versions = ch_versions.mix(CREATE_NCBI_UPLOAD_SHEET.out.versions)
+        // }
 
-            //Fill out NCBI excel sheets for upload based on what PHX found
-            CREATE_NCBI_UPLOAD_SHEET (
-                required_files_ch, params.microbe_example, params.sra_metadata, params.osii_bioprojects, outdir_path, GRIPHIN.out.griphin_tsv_report
-            )
-            ch_versions = ch_versions.mix(CREATE_NCBI_UPLOAD_SHEET.out.versions)
-        }
+        // // Collecting the software versions
+        // CUSTOM_DUMPSOFTWAREVERSIONS (
+        //     ch_versions.unique().collectFile(name: 'collated_versions.yml')
+        // )
 
-        // Collecting the software versions
-        CUSTOM_DUMPSOFTWAREVERSIONS (
-            ch_versions.unique().collectFile(name: 'collated_versions.yml')
-        )
+        // //
+        // // MODULE: MultiQC
+        // //
+        // workflow_summary    = WorkflowPhoenix.paramsSummaryMultiqc(workflow, summary_params)
+        // ch_workflow_summary = Channel.value(workflow_summary)
 
-        //
-        // MODULE: MultiQC
-        //
-        workflow_summary    = WorkflowPhoenix.paramsSummaryMultiqc(workflow, summary_params)
-        ch_workflow_summary = Channel.value(workflow_summary)
+        // ch_multiqc_files = Channel.empty()
+        // ch_multiqc_files = ch_multiqc_files.mix(Channel.from(ch_multiqc_config))
+        // ch_multiqc_files = ch_multiqc_files.mix(ch_multiqc_custom_config.collect().ifEmpty([]))
+        // ch_multiqc_files = ch_multiqc_files.mix(ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
+        // ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
+        // ch_multiqc_files = ch_multiqc_files.mix(FASTQCTRIMD.out.zip.collect{it[1]}.ifEmpty([]))
+        // ch_multiqc_files = ch_multiqc_files.mix(FASTP_TRIMD.out.json.collect{it[1]}.ifEmpty([]))
+        // ch_multiqc_files = ch_multiqc_files.mix(FASTP_SINGLES.out.json.collect{it[1]}.ifEmpty([]))
+        // ch_multiqc_files = ch_multiqc_files.mix(BBDUK.out.log.collect{it[1]}.ifEmpty([]))
+        // ch_multiqc_files = ch_multiqc_files.mix(QUAST.out.report_tsv.collect{it[1]}.ifEmpty([]))
+        // ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_TRIMD.out.report.collect{it[1]}.ifEmpty([]))
+        // ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_WTASMBLD.out.report.collect{it[1]}.ifEmpty([]))
 
-        ch_multiqc_files = Channel.empty()
-        ch_multiqc_files = ch_multiqc_files.mix(Channel.from(ch_multiqc_config))
-        ch_multiqc_files = ch_multiqc_files.mix(ch_multiqc_custom_config.collect().ifEmpty([]))
-        ch_multiqc_files = ch_multiqc_files.mix(ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
-        ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
-        ch_multiqc_files = ch_multiqc_files.mix(FASTQCTRIMD.out.zip.collect{it[1]}.ifEmpty([]))
-        ch_multiqc_files = ch_multiqc_files.mix(FASTP_TRIMD.out.json.collect{it[1]}.ifEmpty([]))
-        ch_multiqc_files = ch_multiqc_files.mix(FASTP_SINGLES.out.json.collect{it[1]}.ifEmpty([]))
-        ch_multiqc_files = ch_multiqc_files.mix(BBDUK.out.log.collect{it[1]}.ifEmpty([]))
-        ch_multiqc_files = ch_multiqc_files.mix(QUAST.out.report_tsv.collect{it[1]}.ifEmpty([]))
-        ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_TRIMD.out.report.collect{it[1]}.ifEmpty([]))
-        ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_WTASMBLD.out.report.collect{it[1]}.ifEmpty([]))
-
-        MULTIQC (
-            ch_multiqc_files.collect()
-        )
-        multiqc_report = MULTIQC.out.report.toList()
-        ch_versions    = ch_versions.mix(MULTIQC.out.versions)
+        // MULTIQC (
+        //     ch_multiqc_files.collect()
+        // )
+        // multiqc_report = MULTIQC.out.report.toList()
+        // ch_versions    = ch_versions.mix(MULTIQC.out.versions)
     
     emit:
-        scaffolds        = BBMAP_REFORMAT.out.filtered_scaffolds
-        trimmed_reads    = FASTP_TRIMD.out.reads
-        mlst             = DO_MLST.out.checked_MLSTs
-        amrfinder_output = AMRFINDERPLUS_RUN.out.report
-        gamma_ar         = GAMMA_AR.out.gamma
-        phx_summary     = GATHER_SUMMARY_LINES.out.summary_report
-        //output for phylophoenix
-        griphin_tsv      = GRIPHIN.out.griphin_report
-        griphin_excel    = GRIPHIN.out.griphin_tsv_report
-        dir_samplesheet  = GRIPHIN.out.converted_samplesheet
-        //output for ncbi upload 
-        ncbi_sra_sheet       = params.create_ncbi_sheet ? CREATE_NCBI_UPLOAD_SHEET.out.ncbi_sra : null
-        ncbi_biosample_sheet = params.create_ncbi_sheet ? CREATE_NCBI_UPLOAD_SHEET.out.ncbi_biosample : null
+        check = FASTP_TRIMD.out.reads
+        // outcome = GET_RAW_STATS.out.outcome
+        // scaffolds        = BBMAP_REFORMAT.out.filtered_scaffolds
+        // trimmed_reads    = FASTP_TRIMD.out.reads
+        // mlst             = DO_MLST.out.checked_MLSTs
+        // amrfinder_output = AMRFINDERPLUS_RUN.out.report
+        // gamma_ar         = GAMMA_AR.out.gamma
+        // phx_summary     = GATHER_SUMMARY_LINES.out.summary_report
+        // //output for phylophoenix
+        // griphin_tsv      = GRIPHIN.out.griphin_report
+        // griphin_excel    = GRIPHIN.out.griphin_tsv_report
+        // dir_samplesheet  = GRIPHIN.out.converted_samplesheet
+        // //output for ncbi upload 
+        // ncbi_sra_sheet       = params.create_ncbi_sheet ? CREATE_NCBI_UPLOAD_SHEET.out.ncbi_sra : null
+        // ncbi_biosample_sheet = params.create_ncbi_sheet ? CREATE_NCBI_UPLOAD_SHEET.out.ncbi_biosample : null
 }
 
 /*

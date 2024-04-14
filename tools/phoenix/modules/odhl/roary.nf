@@ -3,8 +3,6 @@ process ROARY {
     tag "ROARY"
     label 'process_high'
     container 'staphb/roary:3.12.0'
-
-    numGenomes = 0
   
     input:
     path(gff)
@@ -19,9 +17,8 @@ process ROARY {
     task.ext.when == null || task.ext.when
 
     script:
-    def args = task.ext.args ?: ''
     """
-    roary -e $args -p $task.cpus -i ${percent_id} ${gff}
+    roary -e --mafft -p $task.cpus -i ${percent_id} ${gff}
     mv summary_statistics.txt core_genome_statistics.txt
     """
 }

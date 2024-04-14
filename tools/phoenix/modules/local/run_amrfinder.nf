@@ -1,8 +1,9 @@
 process AMRFINDERPLUS_RUN {
     tag "$meta.id"
     label 'process_medium'
-    // 3.12.8-2024-01-31.1 - new
-    container 'staphb/ncbi-amrfinderplus@sha256:45863da98b042fffc17b91d8a42bb7094509c154409da7747b6ba509bca7cdc2'
+    // 3.11.11-2023-04-17.1@sha256:194eec0c758f92c3c8a8884b9f1ddbfb7626977459e8938a6ece98aceb8e3bbd
+    // 3.11.26-2023-11-15.1 - new
+    container 'staphb/ncbi-amrfinderplus@sha256:2311400ff8576f04e77a250e0665daa05f11b67f6a5901c8eac267378dccc932'
 
     input:
     tuple val(meta), path(nuc_fasta), val(organism_param), path(pro_fasta), path(gff)
@@ -17,24 +18,13 @@ process AMRFINDERPLUS_RUN {
     task.ext.when == null || task.ext.when
 
     script:
-    // use --organism
-    if ( "${organism_param[0]}" != "No Match Found") {
-        organism = "--organism ${organism_param[0]}"
-    } else { organism = "" }
-    //set up for terra
-    if (params.terra==false) {
-        terra = ""
-        terra_exit = ""
-    } else if (params.terra==true) {
-        terra = "PATH=/opt/conda/envs/amrfinderplus/bin:\$PATH"
-        terra_exit = """PATH="\$(printf '%s\\n' "\$PATH" | sed 's|/opt/conda/envs/amrfinderplus/bin:||')" """
-    } else {
-        error "Please set params.terra to either \"true\" or \"false\""
-    }
     // define variables
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     def container = task.container.toString() - "staphb/ncbi-amrfinderplus@"
+    def terra = params.terra ? "PATH=/opt/conda/envs/amrfinderplus/bin:\$PATH" : ""
+    def terra_exit = params.terra ? """PATH="\$(printf '%s\\n' "\$PATH" | sed 's|/opt/conda/envs/amrfinderplus/bin:||')" """ : ""
+    def organism = "${organism_param[0]}" != "No Match Found" ? "--organism ${organism_param[0]}" : ""
     //get name of amrfinder database file
     db_name = db.toString() - '.tar.gz'
     """

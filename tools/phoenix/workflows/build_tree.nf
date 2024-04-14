@@ -116,11 +116,80 @@ workflow BUILD_TREE {
             ROARY.out.aln
         )
 
+        // // Make database from mOTUs markers.
+        // SAMESTR_DB(
+        //     params.markers_info1,
+        //     params.markers_info2,
+        //     params.marker_fna,
+        //     params.marker_version
+        // )
+
+        // // align and generate profiles
+        // MOTUS(
+        //     params.db_motu_dir,
+        //     INPUT_CHECK.out.reads
+        // )
+
+        // // sort samfiles
+        // SAMTOOLS_SORT(
+        //     MOTUS.out.bam
+        // )
+
+        // // Convert sequence alignments to SNV Profiles.
+        // SAMESTR_CONVERT(
+        //     SAMTOOLS_SORT.out.bam,
+        //     MOTUS.out.profile,
+        //     SAMESTR_DB.out.samestr_db
+        // )
+
+        // // Extract SNV Profiles from Reference Genomes.
+        // SAMESTR_EXTRACT(
+        //     params.ref_fasta1,
+        //     params.ref_fasta2,
+        //     SAMESTR_DB.out.samestr_db
+        // )
+
+        // // Merge SNV Profiles from multiple sources.
+        // SAMESTR_MERGE(
+        //     SAMESTR_EXTRACT.out.extract,
+        //     SAMESTR_CONVERT.out.convert,
+        //     SAMESTR_EXTRACT.out.extracted_db
+        // )
+        
+        // // Filter SNV Profiles.
+        // SAMESTR_FILTER(
+        //     SAMESTR_MERGE.out.merge_npy,
+        //     SAMESTR_MERGE.out.merge_txt
+        // )
+
+        // // Report alignment statistics.
+        // SAMESTR_STATS(
+        //     SAMESTR_FILTER.out.filter_npy.collect(),
+        //     SAMESTR_FILTER.out.filter_txt.collect(),
+        //     SAMESTR_DB.out.samestr_db
+        // )        
+
+        // // Calculate pairwise sequence similarity.
+        // SAMESTR_COMPARE(
+        //     SAMESTR_FILTER.out.filter_npy.collect(),
+        //     SAMESTR_FILTER.out.filter_txt.collect(),
+        //     SAMESTR_DB.out.samestr_db
+        // )
+
+        // // Summarize Taxonomic Co-Occurrence.
+        // SAMESTR_SUMMARY(
+        //     SAMESTR_COMPARE.out.bams.collect(),
+        //     SAMESTR_MAP.out.bams.collect(),
+        //     SAMESTR_DB.out.samestr_db
+        // )
+
     emit:
         valid_samplesheet            = INPUT_CHECK.out.valid_samplesheet
-        distmatrix  = CFSAN.out.distmatrix
-        core_stats  = ROARY.out.core_stats
-        tree        = TREE.out.genome_tree
+        // bams                         = SAMESTR_CONVERT.out.convert
+        // distmatrix  = CFSAN.out.distmatrix
+        // core_stats  = ROARY.out.core_stats
+        // tree        = TREE.out.genome_tree
+        // samestr_db  = SAMESTR_DB.out.samestr_db
 }
 
 /*

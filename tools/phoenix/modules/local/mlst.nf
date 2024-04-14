@@ -16,10 +16,6 @@ process MLST {
     "${fairy_outcome[4]}" == "PASSED: More than 0 scaffolds in ${meta.id} after filtering."
 
     script:
-    // helps set correct paths to get database version being used
-    if (params.terra==false) { terra = false }
-    else if (params.terra==true) { terra = true}
-    else { error "Please set params.terra to either \"true\" or \"false\""}
     //define variables
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
@@ -27,6 +23,7 @@ process MLST {
     def container = task.container.toString() - "quay.io/jvhagey/mlst@"
     def mlst_version = "2.23.0_01242024"
     def mlst_version_clean = mlst_version.split("_")[0]
+    def terra = params.terra ? "true" : "false"
     """
     if [[ ${fasta} = *.gz ]]
     then
@@ -89,11 +86,6 @@ process MLST {
             mlst --scheme ecoli_2 --threads $task.cpus \$unzipped_fasta > ${prefix}_2.tsv
             cat ${prefix}_1.tsv ${prefix}_2.tsv > ${prefix}.tsv
             rm ${prefix}_*.tsv
-        fi
-    elif [[ \${genus,,} == "enterobacter" ]]; then
-        if [[ \$scheme == "cronobacter" ]]; then
-            mv ${prefix}.tsv ${prefix}.OLD-tsv
-            mlst --scheme ecloacae --threads $task.cpus \$unzipped_fasta > ${prefix}.tsv
         fi
     else
         :
