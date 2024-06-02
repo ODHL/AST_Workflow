@@ -16,7 +16,7 @@ nextflow.enable.dsl = 2
 ========================================================================================
 */
 
-WorkflowMain.initialise(workflow, params, log)
+WorkflowMain.initialise(workflow, params, log, args)
 
 //Check coverage is above its threshold
 if (params.coverage < 30) { exit 1, 'The minimum coverage allowed for QA/QC purposes is 30 and is the default. Please choose a value >=30.' }
@@ -28,13 +28,13 @@ if (params.kraken2db == null) { exit 1, 'Input path to kraken2db not specified!'
     NAMED WORKFLOW FOR PIPELINE
 ========================================================================================
 */
-include { BUILD_TREE                } from './workflows/build_tree'
+// include { BUILD_TREE                } from './workflows/build_tree'
 include { PHOENIX_ODHL_EX           } from './workflows/phoenix_odhl'
-include { PHOENIX_EXTERNAL       } from './workflows/phoenix'
-include { PHOENIX_EXQC           } from './workflows/cdc_phoenix'
-include { SCAFFOLDS_EXTERNAL     } from './workflows/scaffolds'
-include { SCAFFOLDS_EXQC         } from './workflows/cdc_scaffolds'
-include { SRA_PREP               } from './workflows/sra_prep'
+// include { PHOENIX_EXTERNAL       } from './workflows/phoenix'
+// include { PHOENIX_EXQC           } from './workflows/cdc_phoenix'
+// include { SCAFFOLDS_EXTERNAL     } from './workflows/scaffolds'
+// include { SCAFFOLDS_EXQC         } from './workflows/cdc_scaffolds'
+// include { SRA_PREP               } from './workflows/sra_prep'
 
 //
 // WORKFLOW: Run main cdcgov/phoenix analysis pipeline

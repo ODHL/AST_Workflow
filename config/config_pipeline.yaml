@@ -1,15 +1,15 @@
 # params
-batch_limit: 15
+batch_limit: 5
 kraken2_contamination_threshold: 20
 
 # tools
 basespace_cmd: "/home/ubuntu/tools/basespace"
-kraken2_db: "/home/ubuntu/refs/kraken2db/"
+kraken2_db: "/home/ubuntu/refs/k2/k2_standard_08gb_20240112.tar.gz"
 nextflow_cmd: "/home/ubuntu/tools/nextflow"
 ar_dir: "/home/ubuntu/tools/ar_report_generator"
 
 # analysis commands
-analysis_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/AR_Workflow/tools/phoenix/main.nf"
+analysis_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/AST_Workflow/tools/phoenix/main.nf"
 analysis_cmd_trailing: "-profile docker -entry PHOENIX_ODHL --max_memory 7.GB --max_cpus 4"
 tree_cmd_trailing: "-profile docker -entry TREE --max_memory 7.GB --max_cpus 4"
 dbs_cmd_trailing: "-profile docker -entry DBS --max_memory 7.GB --max_cpus 4"
