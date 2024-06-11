@@ -102,12 +102,6 @@ methodsTEXT <- config$methods.text
 sampleDF <- read.csv2(sampletable,sep=",")
 rownames(sampleDF)=sampleDF$specimen_id
 
-# get heatmap
-snpData <- read.csv2(snpmatrix,sep='\t',check.names = F,row.names = 1)
-
-# get tree
-treepath <- tree
-
 # get cgstats
 cgstats <- read.csv2(cgstats,sep='\t',header = FALSE)
 
@@ -130,7 +124,9 @@ tax_nums=generate_ids(c("specimen_id","species","sequence_classification",
                         "mlst_1","gamma_beta_lactam_resistance_genes"))
 qc_nums=generate_ids(c("specimen_id","estimated_coverage","genome_length",
                         "auto_qc_failure_reason"))
+lab_nums=generate_ids(c("specimen_id","species","lab_results"))
 sample_meta=SharedData$new(sampleDF)
+passed_meta=SharedData$new(subset(sampleDF,auto_qc_outcome=="PASS"))
 ```
 
 ```{r summarytext, echo=FALSE}
@@ -323,6 +319,34 @@ if(exists('ar_summary')){
 }
 ```
 
+### Lab Concordance
+```{r lab_conc, echo=FALSE}
+passed_meta %>%
+  DT::datatable(
+    extensions = c("Buttons","Scroller"),
+    rownames=FALSE,
+    style="bootstrap",
+    width="100%",
+    class="compact",
+    options=list(
+      dom="Blrtrip",
+      deferREander=TRUE,
+      columnDefs=list(
+        list(
+          visible=FALSE,
+          targets=lab_nums
+        )
+      ),
+      buttons = list(I("colvis"),"csv","excel")
+      ),
+    colnames = c(
+      "ID" = "specimen_id",
+      "PipelineResults" = "species",
+      "LabResults" = "lab_results"
+    )
+  )
+```
+
 Analysis {data-orientation=columns data-icon="ion-android-options"}
 =================================================================
 Column {data-width=800 .tabset}
@@ -337,29 +361,39 @@ ggplot(aes(x = species,fill=species)) +
 
 ### Heatmap
 ```{r heatmap}
-rowlabels=as.data.frame(rownames(snpData))
-colnames(rowlabels)="specimen_id"
-rowlabels=merge(rowlabels,sampleDF[,c("specimen_id","species")])
+if(exists('snpmatrix')){
+  # get heatmap
+  snpData <- read.csv2(snpmatrix,sep='\t',check.names = F,row.names = 1)
 
-collabels=as.data.frame(colnames(snpData))
-colnames(collabels)="specimen_id"
-collabels=merge(collabels,sampleDF[,c("specimen_id","species")])
+  # create labels
+  rowlabels=as.data.frame(rownames(snpData))
+  colnames(rowlabels)="specimen_id"
+  rowlabels=merge(rowlabels,sampleDF[,c("specimen_id","species")])
 
-heatmaply(snpData,
-          cellnote=snpData,
-          cellnote_size=8,
-          cellnote_textposition = "middle center",
-          col_side_colors = collabels$species,
-          row_side_colors = rowlabels$species,
-          colors = viridis(n = 256, alpha = 1, begin = 1, end = 0, option = "viridis"),
-          show_dendrogram = c(TRUE, FALSE),
-          dist_method=config$heat.dist.method, label_names = c("Row", "Column", "SNPs"))
+  collabels=as.data.frame(colnames(snpData))
+  colnames(collabels)="specimen_id"
+  collabels=merge(collabels,sampleDF[,c("specimen_id","species")])
+
+  heatmaply(snpData,
+            cellnote=snpData,
+            cellnote_size=8,
+            cellnote_textposition = "middle center",
+            col_side_colors = collabels$species,
+            row_side_colors = rowlabels$species,
+            colors = viridis(n = 256, alpha = 1, begin = 1, end = 0, option = "viridis"),
+            show_dendrogram = c(TRUE, FALSE),
+            dist_method=config$heat.dist.method, label_names = c("Row", "Column", "SNPs"))
+}
 ```
 
 ### Phylogenetic Tree
 
 ```{r}
-if(exists('treepath')){
+if(exists('tree')){
+  
+  # get tree
+  treepath <- tree
+
   set.seed(42)
   tree <- ape::read.tree(treepath)
   if(exists('cgstats')){
@@ -388,44 +422,47 @@ if(exists('treepath')){
 
 A phylogeny tree is used to illustrate relationships where a simulation of continuous trait evolution is illustrated (Brownian motion BM model). The "trait value" refers to the values of the simulated continuous trait for each tip (or node). The length of each branch is representative of lineage relatedness.
 ```{r}
-x<-fastBM(tree)
-obj<-contMap(tree,x)
+if(exists('tree')){
+  x<-fastBM(tree)
+  obj<-contMap(tree,x)
+}
 ```
 
 #### Cladogram
 
 A cladogram is used to illustrate relationships, where nodes are labeled with degree of similarity, but where the vertical lines are not representative of lineage relatedness.
 ```{r tree, message=FALSE}
-#https://yulab-smu.top/treedata-book/chapter9.html
-# create basic tree with equal lengths
-p=ggtree(tree,branch.length="none")+  layout_dendrogram()
+if(exists('tree')){
+  #https://yulab-smu.top/treedata-book/chapter9.html
+  # create basic tree with equal lengths
+  p=ggtree(tree,branch.length="none")+  layout_dendrogram()
 
-# pull data to create node labels
-d <- p$data
-bs <- d[!d$isTip,]
-bs$label <- as.numeric(bs$label)
-ggtree_plot <- p + 
-  geom_text(data=bs,aes(label=label,vjust=1.2),size=2)
+  # pull data to create node labels
+  d <- p$data
+  bs <- d[!d$isTip,]
+  bs$label <- as.numeric(bs$label)
+  ggtree_plot <- p + 
+    geom_text(data=bs,aes(label=label,vjust=1.2),size=2)
 
-# create df for labels
-sampleDF$ref="R"
-d <- data.frame(label = p$data$label, 
-                  ref  = sampleDF[p$data$label, c("ref")],
-                  species = sampleDF[p$data$label, c("species")])
-  
-# plot graph
-ggtree_plot %<+% d + 
-  layout_dendrogram()+  
-  geom_tippoint(aes(fill=factor(species), x=x+.5), 
-                size=6, shape=21, color='black')+
-  geom_tiplab(aes(label=ref), size=2.5, offset=-.4,color='black')+
-  geom_tiplab(hjust=1, offset=-1.5, show.legend=FALSE)+
-  theme_dendrogram(plot.margin=margin(0,0,80,0))
+  # create df for labels
+  sampleDF$ref="R"
+  d <- data.frame(label = p$data$label, 
+                    ref  = sampleDF[p$data$label, c("ref")],
+                    species = sampleDF[p$data$label, c("species")])
+    
+  # plot graph
+  ggtree_plot %<+% d + 
+    layout_dendrogram()+  
+    geom_tippoint(aes(fill=factor(species), x=x+.5), 
+                  size=6, shape=21, color='black')+
+    geom_tiplab(aes(label=ref), size=2.5, offset=-.4,color='black')+
+    geom_tiplab(hjust=1, offset=-1.5, show.legend=FALSE)+
+    theme_dendrogram(plot.margin=margin(0,0,80,0))
+}
 ```
 
 #### Morphospace
 Expanding on the evolutionary relatedness, a multi-dimensional space is created to illustrated how closely related species tend to cluster together in morphospace. This reflects the phylogenetic signal in the morphological data, showing how traits have evolved in a manner that is correlated with the species' evolutionary history.
-
 ```{r}
 tree_morph=ape::read.tree(treepath)
 ids=tree_morph$tip.label

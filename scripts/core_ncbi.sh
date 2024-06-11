@@ -111,7 +111,7 @@ if [[ $flag_manifests == "Y" ]]; then
 		# Create manifest for metadata upload
 		chunk1="sample_name\tlibrary_ID\ttitle\tlibrary_strategy\tlibrary_source\tlibrary_selection"
 		chunk2="library_layout\tplatform\tinstrument_model\tdesign_description\tfiletype\tfilename"
-		chunk3="filename2\tfilename3\tfilename4\tassembly\tfasta_file"
+		chunk3="filename2\tfilename3\tfilename4\tassembly\tfasta_file\tMLST"
 		echo -e "${chunk1}\t${chunk2}\t${chunk3}" > $ncbi_metadata
 
 		# process samples
@@ -142,13 +142,16 @@ if [[ $flag_manifests == "Y" ]]; then
 				instrument_model=`echo $project_id | cut -f2 -d"-"| grep -o "^."`
 				if [[ $instrument_model == "M" ]]; then instrument_model="Illumina MiSeq"; else instrument_model="NextSeq 1000"; fi
 
+				# get MLST
+				MLST=`cat $pipeline_results | grep $id | awk -F";" '{print $25}'`
+
 				# break output into chunks
 				chunk1="${wgsID}\t${sample_title}\t${config_bioproject_accession}\t${organism}\t${config_strain}\t${wgsID}\t${config_host}"
 				chunk2="${isolation_source}\t${collection_yr}\t${config_geo_loc_name}\t${config_sample_type}\t${config_taltitude}"
 				chunk3="${config_biomaterial_provider}\t${config_tcollected_by}\t${config_culture_collection}\t${config_depth}"
 				chunk4="${config_env_broad_scale}\t${config_genotype}\t${config_host_tissue_sampled}\t${config_identified_by}"
 				chunk5="${config_lab_host}\t${config_lat_lon}\t${config_mating_type}\t${config_passage_history}\t${config_samp_size}"
-				chunk6="${config_serotype}\t${config_serovar}\t${config_specimen_voucher}\t${config_temp}\t${config_description}"
+				chunk6="${config_serotype}\t${config_serovar}\t${config_specimen_voucher}\t${config_temp}\t${config_description}\t${MLST}"
 				
 				# add output variables to attributes file
 				echo -e "${chunk1}\t${chunk2}\t${chunk3}\t${chunk4}\t${chunk5}\t${chunk6}\t${chunk7}\t${chunk8}\t${chunk9}\t${chunk10}\t${chunk11}\t${chunk12}" >> $ncbi_attributes
@@ -161,7 +164,7 @@ if [[ $flag_manifests == "Y" ]]; then
 				# add output variables to attributes file
 				echo -e "${chunk1}\t${chunk2}\t${chunk3}" >> $ncbi_metadata
 	    	else
-	    		echo "Missing metadata $f"
+	    		echo "Missing metadata $id"
 	    	fi
     	done
 	done

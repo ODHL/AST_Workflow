@@ -117,9 +117,6 @@ if [[ $pipeline == "phase1" ]]; then
 	# run through analysis workflow
         bash run_workflow.sh -p analysis -n $project_id -s ALL
 
-        # run through tree workflow
-        bash run_workflow.sh -p tree -n $project_id -s ALL
-
         # create WGS ids
         bash run_workflow.sh -p wgs -n $project_id
 

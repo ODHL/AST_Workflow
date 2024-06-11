@@ -86,7 +86,7 @@ if [[ $flag_basic == "Y" ]]; then
     chunk1="specimen_id,wgs_id,srr_id,wgs_date_put_on_sequencer,sequence_classification,run_id"
     chunk2="auto_qc_outcome,estimated_coverage,genome_length,species,mlst_scheme_1"
     chunk3="mlst_1,mlst_scheme_2,mlst_2,gamma_beta_lactam_resistance_genes"
-    chunk4="auto_qc_failure_reason"
+    chunk4="auto_qc_failure_reason,lab_results"
     echo -e "${chunk1},${chunk2},${chunk3},${chunk4}" > $final_results 
     
     # generate predictions file
@@ -123,31 +123,25 @@ if [[ $flag_basic == "Y" ]]; then
         Genome_Length=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $5}'`
         Auto_QC_Failure_Reason=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $24}'`
         
-        # set taxonomy
-        Species=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $14}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
+        # get MLST
+        Species=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $9}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
         MLST_1=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $16}'| cut -f1 -d","`
         MLST_Scheme_1=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $15}'`
         MLST_2=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $18}'| cut -f1 -d","`
         MLST_Scheme_2=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $17}'`
-        # handle schemes that have parenthesis
-        if [[ $MLST_Scheme_1 =~ "(" ]]; then MLST_Scheme_1=`echo $MLST_Scheme_1 | sed -E -n 's/.*\((.*)\).*$/\1/p'`; fi
-        if [[ $MLST_Scheme_2 =~ "(" ]]; then MLST_Scheme_2=`echo $MLST_Scheme_2 | sed -E -n 's/.*\((.*)\).*$/\1/p'`; fi
-
-        # check if there is a second MLST
-        if [[ $MLST_2 == "-" ]]; then
-            sequence_classification=`echo "MLST_${MLST_1}_${MLST_Scheme_1}_${Species}"`
-        else
-            sequence_classification=`echo "MLST_${MLST_1}_${MLST_Scheme_1}_${Species}-${MLST_2}_${MLST_Scheme_2}_${Species}"`
-        fi
-
+        sequence_classification=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $25}'`
+        
         # set genes
         GAMMA_Beta_Lactam_Resistance_Genes=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $19}'`
         
+        # set genes
+        LabValidation=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $26}'`
+
         # prepare chunks
         chunk1="$sample_id,$wgs_id,$srr_number,$wgs_date_put_on_sequencer,\"${sequence_classification}\",$run_id"
         chunk2="$Auto_QC_Outcome,$Estimated_Coverage,$Genome_Length,"${Species}",$MLST_Scheme_1"
         chunk3="\"${MLST_1}\",$MLST_Scheme_2,\"${MLST_2}\",\"${GAMMA_Beta_Lactam_Resistance_Genes}\""
-        chunk4="\"${Auto_QC_Failure_Reason}\""
+        chunk4="\"${Auto_QC_Failure_Reason}\",\"${LabValidation}\""
         echo -e "${chunk1},${chunk2},${chunk3},${chunk4}" >> $final_results
     	
         # create all genes output file

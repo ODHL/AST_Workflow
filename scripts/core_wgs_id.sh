@@ -20,7 +20,7 @@ flag_ids="Y"
 ##########################################################
 # Set files, dir
 #########################################################
-wgs_dir="/home/ubuntu/workflows/AR_Workflow/wgs_db"
+wgs_dir="/home/ubuntu/workflows/AST_Workflow/wgs_db"
 
 #########################################################
 # project variables
