@@ -117,6 +117,8 @@ if [[ $flag_prep == "Y" ]]; then
 			echo "${sample_id},$gff,$fq_dest/$fq1,$fq_dest/$fq2" >> $samplesheet
 		fi
 	done
+
+	cat $samplesheet
 fi
 
 if [[ $flag_analysis == "Y" ]]; then
@@ -161,8 +163,8 @@ if [[ $flag_report == "Y" ]]; then
 	#############################################################################################	
 	if [[ -f $merged_roary ]] && [[ -f $merged_tree ]] && [[ -f $merged_snp ]]; then
 		message_cmd_log "--Pipeline Completed `date`"
-		rm -rf $pipeline_dir
-		rm -rf $trimm_dir
+		#rm -rf $pipeline_dir
+		#rm -rf $trimm_dir
 	else
 		message_cmd_log "--Pipeline FAILED `date`"
 		exit

@@ -6,7 +6,8 @@ srr_dir=$raw_dir/srr
 if [[ ! -d $srr_dir ]]; then mkdir -p $srr_dir; fi
 
 cd $output_dir
-for SRRNUM in "${raw_list[@]}"; do
+for SRRLINE in "${raw_list[@]}"; do
+	SRRNUM=`echo $SRRLINE | cut -f1 -d";"`
     if [[ $SRRNUM =~ "SRR" ]]; then
         echo "--$SRRNUM"
         if [[ ! -f "$raw_dir/${SRRNUM}*.gz" ]]; then

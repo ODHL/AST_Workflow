@@ -33,6 +33,8 @@ metadataFILE=${config_metadata_file}
 # set basespace command
 basespace_command=${config_basespace_cmd}
 
+# backup
+cp srr_db/srr_db_master.csv srr_db/srr_db_backup.csv
 #########################################################
 # Controls
 #########################################################
@@ -72,7 +74,21 @@ if [[ $flag_batch == "Y" ]]; then
 		
 	# pull samples that have passed QC, have WGS-IDs
 	passed_samples="$ncbi_dir/passed_list.txt"
-	cat $pipeline_results | grep "PASS" | awk -F";" '{print $1}' | uniq > $passed_samples
+	if [[ -f $passed_samples ]]; then rm $passed_samples; rm passed_samples; fi
+	touch $passed_samples
+
+	cat $pipeline_results | grep "PASS" | awk -F";" '{print $1}' | uniq > passed_samples
+	IFS=$'\n' read -d '' -r -a sample_list < passed_samples
+	for id in "${sample_list[@]}"; do
+		wgs_id=`cat wgs_db/wgs_db_master.csv | grep $id | cut -f1 -d","`
+		srr_old=`cat srr_db/srr_db_master.csv | grep $wgs_id | cut -f1 -d","` 
+		if [[ $srr_old == "" ]]; then
+			echo "NEW SAMPLE: $id"
+			echo $id >> $passed_samples
+		else
+			echo "SRR already exists: $srr_old for $id"
+		fi
+	done
 
 	# split into chunks of 50
 	split $passed_samples $ncbi_dir/manifest_batch_ --numeric=1 -l 50 --numeric-suffixes --additional-suffix=.txt
@@ -125,8 +141,11 @@ if [[ $flag_manifests == "Y" ]]; then
 			# grab metadata line
 			meta=`cat $metadataFILE | grep "$id"`
 
+			# check if it's been uploaded; if it has ignore
+			sraID=`cat srr_db/srr_db_master.csv | grep $SID | awk -F"," '{print $1}'`
+
 			#if meta is found create input metadata row
-			if [[ ! "$meta" == "" ]]; then
+			if [[ ! "$meta" == "" ]] && [[ ! "$sraID" == "" ]]; then
 				#convert date to ncbi required format - 4/21/81 to 1981-04-21
 				raw_date=`echo $meta | grep -o "[0-9]*/[0-9]*/202[0-9]*"`
 				collection_yr=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[3]}' | tr -d '"'`
@@ -215,13 +234,13 @@ if [[ "$flag_precheck" == "Y" ]]; then
 			# check FASTQ is in dir
 			R1=`ls $batch_dir | grep $id | grep R1`
 			R2=`ls $batch_dir | grep $id | grep R2`
-			if [[ $R1 == "" ]] || [[ $R2 == "" ]]; then echo "----R1/R2 Error"; fi
+			if [[ $R1 == "" ]] || [[ $R2 == "" ]]; then echo "----$id R1/R2 Error"; fi
 			
 			# check ID is in attributes and metadata
 			wgsID=`cat $wgs_results | grep $id | awk -F"," '{print $2}'`
 			att=`cat $ncbi_attributes | grep $wgsID`
 			meta=`cat $ncbi_metadata | grep $wgsID`
-			if [[ $att == "" ]] || [[ $meta == "" ]]; then echo "----ATT/META Error"; fi
+			if [[ $att == "" ]] || [[ $meta == "" ]]; then echo "----$id ATT/META Error"; fi
 		done
 	done
 	echo "-----READY FOR UPLOAD"
@@ -263,6 +282,5 @@ if [[ "$flag_post" == "Y" ]]; then
 	done
 
 	head $ncbi_results
-	cp srr_db/srr_db_master.csv srr_db/srr_db_backup.csv
 	mv srr_db/srr_db_tmp.csv srr_db/srr_db_master.csv
 fi

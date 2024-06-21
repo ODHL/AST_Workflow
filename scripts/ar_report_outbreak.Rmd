@@ -100,6 +100,9 @@ disclaimerTEXT <- config$disclaimer.text
 
 ## get methods text
 methodsTEXT <- config$methods.text
+
+## get reference
+referenceTEXT <- config$reference.text
 ```
 
 ```{r read, echo=FALSE}
@@ -112,8 +115,16 @@ rownames(sampleDF)=sampleDF$specimen_id
 metadataDF = read.csv(metadata)
 
 # sampleDF and metadata  merge
-sampleDF=merge(sampleDF,metadataDF[,c("sampleID","Category","Project")], 
-               by.x="specimen_id", by.y="sampleID")
+sampleDF=merge(sampleDF,metadataDF[,c("specimen_id","pt_city","isolation_source",
+                                      "pt_county","healthcare_origin",
+                                      "submitter_name","collect_date")], 
+               by="specimen_id",all=TRUE)
+
+# replace NAs
+sampleDF$srr_id <- ifelse(sampleDF$srr_id == "NO_ID", sampleDF$specimen_id,
+                          sampleDF$srr_id)
+sampleDF$pt_city[is.na(sampleDF$pt_city)] <- "Unknown"
+sampleDF$healthcare_origin[is.na(sampleDF$healthcare_origin)] <- "Unknown"
 
 # get heatmap
 snpData <- read.csv2(snpmatrix,sep='\t',check.names = F,row.names = 1)
@@ -147,10 +158,10 @@ sample_meta=SharedData$new(sampleDF)
 
 ```{r summarytext, echo=FALSE}
 # generate summary test for outupt
-pass_n=nrow(subset(sampleDF, auto_qc_outcome=="PASS" &Category!="Reference"))
-failed_n=nrow(subset(sampleDF, auto_qc_outcome!="PASS" &Category!="Reference" ))
-failed_samples=subset(sampleDF, auto_qc_outcome!="PASS"&Category!="Reference")$specimen_id
-summaryTEXT=paste0("There were ", nrow(subset(sampleDF,Category!="Reference"))," samples analyzed and ",
+pass_n=nrow(subset(sampleDF, auto_qc_outcome=="PASS"))
+failed_n=nrow(subset(sampleDF, auto_qc_outcome!="PASS"))
+failed_samples=subset(sampleDF, auto_qc_outcome!="PASS")$specimen_id
+summaryTEXT=paste0("There were ", nrow(sampleDF)," samples analyzed and ",
                    pass_n, " samples passed quality control thresholds, while ",
                    length(failed_samples)," failed.")
 if(failed_n>0){
@@ -159,14 +170,6 @@ if(failed_n>0){
                      paste(failed_samples,collapse=" | "),".")
 }
 ```
-
-```{r referenceTEXT, echo=FALSE}
-reference_samples=subset(sampleDF,Category=="Reference"&auto_qc_outcome=="PASS" )$specimen_id
-ref_n=length(reference_samples)
-species_id=unique(subset(sampleDF,Category=="Reference"&auto_qc_outcome=="PASS" )$species)
-referenceTEXT=paste0("Several reference samples, not related to the outbreak, were included for comparison. These samples were randomly chosen from previous AR projects, all belonging to the same suspected species identification (",species_id,"). These (", ref_n,") samples included: ",paste(reference_samples,collapse=" | "), ". They are identified in subsequent data tables and figures.")
-```
-
 
 Information {data-orientation=columns data-icon="fa-info-circle"}
 =================================================================
@@ -208,16 +211,16 @@ filter_select(
   group = ~auto_qc_outcome
 )
 filter_select(
-  id="Category",
-  label = "Category",
+  id="PT County",
+  label = "pt_county",
   sharedData = sample_meta,
-  group = ~Category
+  group = ~pt_county
 )
 filter_select(
-  id="run_id",
-  label = "Run ID",
+  id="healthcare_origin",
+  label = "Healthcare Origin",
   sharedData = sample_meta,
-  group = ~run_id
+  group = ~healthcare_origin
 )
 ```
 
@@ -248,7 +251,8 @@ sample_meta %>%
       "QC" = "auto_qc_outcome",
       "eLIMS_ID" = "specimen_id",
       "WGS" = "wgs_id",
-      "SRR" = "srr_id"
+      "SRR" = "srr_id",
+      "Lab_Results" = "lab_results"
     )
   )
 ```
@@ -323,19 +327,19 @@ subset(sampleDF,auto_qc_outcome=="PASS")%>%
 ```{r heatmap}
 collabels=as.data.frame(colnames(snpData))
 colnames(collabels)="specimen_id"
-collabels=merge(collabels,sampleDF[,c("specimen_id","Category")])
+collabels=merge(collabels,sampleDF[,c("specimen_id","healthcare_origin")])
 
 rowlabels=as.data.frame(rownames(snpData))
 colnames(rowlabels)="specimen_id"
-rowlabels=merge(rowlabels,sampleDF[,c("specimen_id","species")])
+rowlabels=merge(rowlabels,sampleDF[,c("specimen_id","mlst_1")])
 
 heatmaply(snpData,
           cellnote=snpData,
           cellnote_size=8,
           cellnote_textposition = "middle center",
-          col_side_colors = data.frame("Category" = collabels[,c("Category")],
+          col_side_colors = data.frame("healthcare_origin" = collabels[,c("healthcare_origin")],
                                        check.names=FALSE),
-          row_side_colors = data.frame("Species" = rowlabels[,c("species")],
+          row_side_colors = data.frame("MLST" = rowlabels[,c("mlst_1")],
                                        check.names=FALSE),
           colors = viridis(n = 256, alpha = 1, 
                            begin = 1, end = 0, option = "viridis"),
@@ -347,7 +351,7 @@ heatmaply(snpData,
 
 ### Phylogenetic Tree
 
-```{r}
+```{r treeparams}
 if(exists('treepath')){
   set.seed(42)
   tree <- ape::read.tree(treepath)
@@ -375,18 +379,25 @@ if(exists('treepath')){
 
 #### Ancestrial Tree
 
-A phylogeny tree is used to illustrate relationships where a simulation of continuous trait evolution is illustrated (Brownian motion BM model). The "trait value" refers to the values of the simulated continuous trait for each tip (or node). The length of each branch is representative of lineage relatedness.
+A phylogeny tree is used to illustrate relationships where a simulation of continuous trait evolution is illustrated (Brownian motion BM model). The "trait value" refers to the values of the simulated continuous trait for each tip (or node). The length of each branch is representative of lineage relatedness. The first image includes all samples; all subsequent images shows subsets of the complete dataset, highlighting other potential relationships.
 
-```{r}
+1. Complete dataset
+2. Removing all samples with "Unknown" healthcare origin"
+3. Removing subset of samples clustering most differently
+
+```{r treepruned}
 x<-fastBM(tree)
 obj<-contMap(tree,x)
-plot(obj,type="fan",lwd=2)
+plot(obj,type="fan",lwd=2,fsize=c(.8,.5))
 
-# tree_pruned <- drop.tip(tree, "23AR000059")
-# x_pruned<-fastBM(tree_pruned)
-# obj_pruned<-contMap(tree_pruned,x_pruned)
-# plot(obj_pruned,type="fan",lwd=2) ## for example
+# plot3
+tree_pruned <- drop.tip(tree, 
+                        subset(sampleDF,healthcare_origin=="Unknown")$specimen_id)
+x_pruned<-fastBM(tree_pruned)
+obj_pruned<-contMap(tree_pruned,x_pruned)
+plot(obj_pruned,type="fan",lwd=2,fsize=c(.7,.5)) ## for example
 
+# plot3
 ```
 
 
@@ -408,18 +419,16 @@ ggtree_plot <- p +
 
 # create df for labels
 rownames(sampleDF)=sampleDF$specimen_id
-sampleDF$ref=sampleDF$Category
-sampleDF$ref=gsub("Reference","R",sampleDF$ref)
-sampleDF$ref=gsub("Outbreak","O",sampleDF$ref)
+sampleDF$ref <- as.integer(factor(sampleDF$pt_city, levels = unique(sampleDF$pt_city)))
 labels=p$data$label[p$data$label %ni% bs$label]
 d <- data.frame(label = labels, 
                   ref  = sampleDF[labels, c("ref")],
-                  species = sampleDF[labels, c("species")])
+                  mlst = sampleDF[labels, c("mlst_1")])
 
 # plot graph
 ggtree_plot %<+% d + 
   layout_dendrogram()+  
-  geom_tippoint(aes(fill=factor(species), x=x+.5), 
+  geom_tippoint(aes(fill=factor(mlst), x=x+.5), 
                 size=6, shape=21, color='black')+
   geom_tiplab(aes(label=ref), size=2.5, offset=-.4,color='black')+
   geom_tiplab(hjust=1, offset=-1.5, show.legend=FALSE)+
@@ -429,12 +438,12 @@ ggtree_plot %<+% d +
 #### Morphospace
 Expanding on the evolutionary relatedness, a multi-dimensional space is created to illustrated how closely related species tend to cluster together in morphospace. This reflects the phylogenetic signal in the morphological data, showing how traits have evolved in a manner that is correlated with the species' evolutionary history.
 
-```{r}
+```{r treemorph}
 tree_morph=ape::read.tree(treepath)
 ids=tree_morph$tip.label
 DT::datatable(data.frame(ID=c(1:length(ids)),
                          wgs_ID=ids,
-                         Category=sampleDF[ids,"Category"]))
+                         HealthcareOrigin=sampleDF[ids,"healthcare_origin"]))
 tree_morph$tip.label=c(1:length(ids))
 X<-fastBM(tree_morph,nsim=3) ## simulate 3 characters
 colors<-sapply(tree$edge[,2], function(x,n) if(x>n) "blue"

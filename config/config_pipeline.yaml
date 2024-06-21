@@ -1,5 +1,5 @@
 # params
-batch_limit: 20
+batch_limit: 6
 kraken2_contamination_threshold: 20
 
 # tools

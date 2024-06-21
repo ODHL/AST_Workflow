@@ -103,7 +103,7 @@ sampleDF <- read.csv2(sampletable,sep=",")
 rownames(sampleDF)=sampleDF$specimen_id
 
 # get cgstats
-cgstats <- read.csv2(cgstats,sep='\t',header = FALSE)
+if(exists(cgstats)){cgstats <- read.csv2(cgstats,sep='\t',header = FALSE)}
 
 # get ar-summary
 ar_summary <- read.csv2(arpredictions,sep='\t',check.names = F)
@@ -464,16 +464,18 @@ if(exists('tree')){
 #### Morphospace
 Expanding on the evolutionary relatedness, a multi-dimensional space is created to illustrated how closely related species tend to cluster together in morphospace. This reflects the phylogenetic signal in the morphological data, showing how traits have evolved in a manner that is correlated with the species' evolutionary history.
 ```{r}
-tree_morph=ape::read.tree(treepath)
-ids=tree_morph$tip.label
-DT::datatable(data.frame(ID=c(1:length(ids)),
-                         wgs_ID=ids))
-tree_morph$tip.label=c(1:length(ids))
-X<-fastBM(tree_morph,nsim=3) ## simulate 3 characters
-colors<-sapply(tree$edge[,2], function(x,n) if(x>n) "blue"
-  else "red",n=length(tree$tip.label))
-phylomorphospace3d(tree_morph,X,control=list(col.edge=colors))
-rglwidget()
+if(exists('tree')){
+  tree_morph=ape::read.tree(treepath)
+  ids=tree_morph$tip.label
+  DT::datatable(data.frame(ID=c(1:length(ids)),
+                          wgs_ID=ids))
+  tree_morph$tip.label=c(1:length(ids))
+  X<-fastBM(tree_morph,nsim=3) ## simulate 3 characters
+  colors<-sapply(tree$edge[,2], function(x,n) if(x>n) "blue"
+    else "red",n=length(tree$tip.label))
+  phylomorphospace3d(tree_morph,X,control=list(col.edge=colors))
+  rglwidget()
+}
 ```
 
 ### ARGene Summary

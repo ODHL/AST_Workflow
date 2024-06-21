@@ -96,6 +96,7 @@ if [[ $flag_basic == "Y" ]]; then
     for sample_id in "${sample_list[@]}"; do
         sample_id=$(clean_file_names $sample_id)
         cleanid=`echo $sample_id | cut -f1 -d"-"`
+        echo $cleanid
         
         # check WGS ID, if available
         if [[ -f $wgs_results ]]; then 
@@ -107,8 +108,13 @@ if [[ $flag_basic == "Y" ]]; then
         fi
 
         # check NCBI, if available
-        srr_number=`cat srr_db/srr_db_master.csv | grep $wgs_id | awk -F"," '{print $1}'`
+        if [[ $wgs_id != "NO_ID" ]]; then 
+            srr_number=`cat srr_db/srr_db_master.csv | grep $wgs_id | awk -F"," '{print $1}'`
+        else
+            srr_number="NO_ID"
+        fi
         if [[ $srr_number == "" ]]; then srr_number="NO_ID"; fi
+        echo "----$srr_number"
         
         # set seq info
         wgs_date_put_on_sequencer=`echo $project_name | cut -f3 -d"-"`
@@ -151,7 +157,7 @@ if [[ $flag_basic == "Y" ]]; then
     # set up reports
     arRMD="$analysis_dir/reports/ar_report_basic.Rmd"
     cp scripts/ar_report_basic.Rmd $arRMD
-    cp $config_logo_file $analysis_dir/reports
+    cp assets/$config_logo_file $analysis_dir/reports
 
     # prepare report
     micropath="L://Micro/WGS/AR WGS/projects/$project_name"
@@ -187,7 +193,7 @@ if [[ $flag_outbreak == "Y" ]]; then
     # set up reports
     arRMD="$analysis_dir/reports/ar_report_outbreak.Rmd"
     cp scripts/ar_report_outbreak.Rmd $arRMD
-    cp $config_logo_file $analysis_dir/reports
+    cp assets/$config_logo_file $analysis_dir/reports
 
     # prepare report
     micropath="L://Micro/WGS/AR WGS/_outbreak/$OBID/$project_name"

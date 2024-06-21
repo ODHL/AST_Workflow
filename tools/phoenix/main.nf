@@ -28,7 +28,7 @@ if (params.kraken2db == null) { exit 1, 'Input path to kraken2db not specified!'
     NAMED WORKFLOW FOR PIPELINE
 ========================================================================================
 */
-// include { BUILD_TREE                } from './workflows/build_tree'
+include { BUILD_TREE                } from './workflows/build_tree'
 include { PHOENIX_ODHL_EX           } from './workflows/phoenix_odhl'
 // include { PHOENIX_EXTERNAL       } from './workflows/phoenix'
 // include { PHOENIX_EXQC           } from './workflows/cdc_phoenix'
