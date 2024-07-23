@@ -21,7 +21,7 @@ WorkflowMain.initialise(workflow, params, log, args)
 //Check coverage is above its threshold
 if (params.coverage < 30) { exit 1, 'The minimum coverage allowed for QA/QC purposes is 30 and is the default. Please choose a value >=30.' }
 //Check path of kraken2db
-if (params.kraken2db == null) { exit 1, 'Input path to kraken2db not specified!' }
+//if (params.kraken2db == null) { exit 1, 'Input path to kraken2db not specified!' }
 
 /*
 ========================================================================================
@@ -30,6 +30,7 @@ if (params.kraken2db == null) { exit 1, 'Input path to kraken2db not specified!'
 */
 include { BUILD_TREE                } from './workflows/build_tree'
 include { PHOENIX_ODHL_EX           } from './workflows/phoenix_odhl'
+include { CREATE_REPORT                    } from './workflows/reports'
 // include { PHOENIX_EXTERNAL       } from './workflows/phoenix'
 // include { PHOENIX_EXQC           } from './workflows/cdc_phoenix'
 // include { SCAFFOLDS_EXTERNAL     } from './workflows/scaffolds'
@@ -116,6 +117,21 @@ workflow TREE {
         // tree        = BUILD_TREE.out.tree
         // samestr_db  = BUILD_TREE.out.samestr_db
 }
+
+//
+// WORKFLOW: Create report
+//
+workflow REPORT {
+    if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry PHOENIX: Input samplesheet not specified!' }
+
+    main:
+        CREATE_REPORT( ch_input )
+
+    emit:
+        report_outbreak            = CREATE_REPORT.out.report_outbreak
+
+}
+
 
 //
 // WORKFLOW: Run internal version of cdcgov/phoenix analysis pipeline that includes BUSCO, SRST2 and KRAKEN_ASMBLED
