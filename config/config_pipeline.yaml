@@ -12,6 +12,7 @@ ar_dir: "/home/ubuntu/tools/ar_report_generator"
 analysis_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/AST_Workflow/tools/phoenix/main.nf"
 analysis_cmd_trailing: "-profile docker -entry PHOENIX_ODHL --max_memory 7.GB --max_cpus 4"
 tree_cmd_trailing: "-profile docker -entry TREE --max_memory 7.GB --max_cpus 4"
+report_cmd_trailing: "-profile docker -entry REPORT --max_memory 7.GB --max_cpus 4"
 dbs_cmd_trailing: "-profile docker -entry DBS --max_memory 7.GB --max_cpus 4"
 
 # ref files
