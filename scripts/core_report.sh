@@ -46,6 +46,10 @@ merged_tree="$intermed_dir/core_genome.tree"
 merged_cgstats="$intermed_dir/core_genome_statistics.txt"
 
 project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
+
+# set cmd
+analysis_cmd=$config_analysis_cmd
+analysis_cmd_trailing=$config_report_cmd_trailing
 ##########################################################
 # Set flags
 #########################################################
@@ -65,6 +69,8 @@ elif [[ $subworkflow == "REGIONAL" ]]; then
     flag_regional="Y"
 elif [[ $subworkflow == "TIME" ]]; then
     flag_time="Y"
+elif [[ $subworkflow == "NF" ]]; then
+    flag_nf="Y"
 else
     echo "Check report type selected: $subworkflow"
     echo "Must be BASIC OUTBREAK NOVEL REGIONAL TIME"
@@ -104,7 +110,7 @@ if [[ $flag_basic == "Y" ]]; then
         else
             # outbreak samples will not have WGS run individually - pull projects that ID's were created
             wgs_id=`cat wgs_db/wgs_db_master.csv | grep $cleanid | awk -F"," '{print $1}'`
-            if [[ $wgs_id == "" ]]; then wgs_id="NO_ID"; fi
+            if [[ $wgs_id == "" ]]; then wgs_id="WGS: NO_ID"; fi
         fi
 
         # check NCBI, if available
@@ -113,8 +119,7 @@ if [[ $flag_basic == "Y" ]]; then
         else
             srr_number="NO_ID"
         fi
-        if [[ $srr_number == "" ]]; then srr_number="NO_ID"; fi
-        echo "----$srr_number"
+        if [[ $srr_number == "" ]]; then srr_number="SRR: NO_ID"; fi
         
         # set seq info
         wgs_date_put_on_sequencer=`echo $project_name | cut -f3 -d"-"`
@@ -128,7 +133,15 @@ if [[ $flag_basic == "Y" ]]; then
         Estimated_Coverage=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $4}'`
         Genome_Length=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $5}'`
         Auto_QC_Failure_Reason=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $24}'`
-        
+
+        # if samples fail due to seq (low reads), adjust
+        if [[ $Auto_QC_Outcome == "" ]]; then Auto_QC_Outcome="SeqFAIL"; Auto_QC_Failure_Reason="sequencing_failure"; fi
+
+        # recap    
+        echo "----$Auto_QC_Outcome"    
+        echo "----$wgs_id"
+        echo "----$srr_number"
+
         # get MLST
         Species=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $9}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
         MLST_1=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $16}'| cut -f1 -d","`
@@ -151,8 +164,10 @@ if [[ $flag_basic == "Y" ]]; then
         echo -e "${chunk1},${chunk2},${chunk3},${chunk4}" >> $final_results
     	
         # create all genes output file
-		cat $output_dir/tmp/amr/${sample_id}_all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' $f | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence">> $merged_prediction
-	done
+		if [[ $Auto_QC_Outcome == "PASS" ]]; then
+            cat $output_dir/tmp/amr/${sample_id}_all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' $f | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence">> $merged_prediction
+        fi
+    done
     
     # set up reports
     arRMD="$analysis_dir/reports/ar_report_basic.Rmd"
@@ -166,7 +181,7 @@ if [[ $flag_basic == "Y" ]]; then
     # run multiQC
 	runMULTIQC
 
-    if [[ -f $qc_report ]] && [[ ! -f $output_dir/fastq.tar.gz ]]; then
+    if [[ -f $qc_report ]] & [[ ! -f $output_dir/fastq.tar.gz ]]; then
         tar -zcvf $output_dir/fastq.tar.gz $output_dir/tmp/rawdata/fastq
     fi
 
@@ -198,4 +213,28 @@ if [[ $flag_outbreak == "Y" ]]; then
     # prepare report
     micropath="L://Micro/WGS/AR WGS/_outbreak/$OBID/$project_name"
     prepREPORT
+fi
+
+if [[ $flag_nf == "Y" ]]; then    
+    message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--OUTBREAK REPORT to NF"
+	message_cmd_log "------------------------------------------------------------------------"
+    
+    # read in final report; create sample list
+    IFS=$'\n' read -d '' -r -a sample_list < $sample_ids
+
+    # generate predictions file
+    echo -e "Sample \tGene \tCoverage \tIdentity" > $merged_prediction
+
+    # create final result file    
+    for sample_id in "${sample_list[@]}"; do
+		check=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $2}'`
+        cat $output_dir/tmp/amr/${cleanid}*all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' $f | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence">> $merged_prediction
+	done
+
+    # create report
+    samplesheet=$log_dir/manifests/samplesheet_gff.csv	
+	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --type outbreak --outdir $output_dir --projectID $project_name -with-conda"
+    echo $pipeline_full_cmd
+    $pipeline_full_cmd
 fi

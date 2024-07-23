@@ -361,7 +361,7 @@ ggplot(aes(x = species,fill=species)) +
 
 ### Heatmap
 ```{r heatmap}
-if(exists('snpmatrix')){
+if(exists(snpmatrix)){
   # get heatmap
   snpData <- read.csv2(snpmatrix,sep='\t',check.names = F,row.names = 1)
 
@@ -389,7 +389,7 @@ if(exists('snpmatrix')){
 ### Phylogenetic Tree
 
 ```{r}
-if(exists('tree')){
+if(exists(tree)){
   
   # get tree
   treepath <- tree
@@ -422,7 +422,7 @@ if(exists('tree')){
 
 A phylogeny tree is used to illustrate relationships where a simulation of continuous trait evolution is illustrated (Brownian motion BM model). The "trait value" refers to the values of the simulated continuous trait for each tip (or node). The length of each branch is representative of lineage relatedness.
 ```{r}
-if(exists('tree')){
+if(exists(tree)){
   x<-fastBM(tree)
   obj<-contMap(tree,x)
 }
@@ -432,7 +432,7 @@ if(exists('tree')){
 
 A cladogram is used to illustrate relationships, where nodes are labeled with degree of similarity, but where the vertical lines are not representative of lineage relatedness.
 ```{r tree, message=FALSE}
-if(exists('tree')){
+if(exists(tree)){
   #https://yulab-smu.top/treedata-book/chapter9.html
   # create basic tree with equal lengths
   p=ggtree(tree,branch.length="none")+  layout_dendrogram()
@@ -464,7 +464,7 @@ if(exists('tree')){
 #### Morphospace
 Expanding on the evolutionary relatedness, a multi-dimensional space is created to illustrated how closely related species tend to cluster together in morphospace. This reflects the phylogenetic signal in the morphological data, showing how traits have evolved in a manner that is correlated with the species' evolutionary history.
 ```{r}
-if(exists('tree')){
+if(exists(tree)){
   tree_morph=ape::read.tree(treepath)
   ids=tree_morph$tip.label
   DT::datatable(data.frame(ID=c(1:length(ids)),
@@ -480,7 +480,6 @@ if(exists('tree')){
 
 ### ARGene Summary
 ```{r ar_summary}
-if(exists('ar_summary')){
   # if there are consensus genes then print table
   if (nrow(output_df)==0){
     print("There are no genes with consensus between at least 50% of samples")
@@ -492,7 +491,7 @@ if(exists('ar_summary')){
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
       facet_grid(~run_id)
   }
-}
+
 ```
 
 Column {data-width=300}
