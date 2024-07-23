@@ -83,10 +83,10 @@ if [[ $flag_batch == "Y" ]]; then
 		wgs_id=`cat wgs_db/wgs_db_master.csv | grep $id | cut -f1 -d","`
 		srr_old=`cat srr_db/srr_db_master.csv | grep $wgs_id | cut -f1 -d","` 
 		if [[ $srr_old == "" ]]; then
-			echo "NEW SAMPLE: $id"
+			echo "NEW SAMPLE: $id ($wgs_id)"
 			echo $id >> $passed_samples
 		else
-			echo "SRR already exists: $srr_old for $id"
+			echo "SRR already exists: $srr_old ($id)"
 		fi
 	done
 
@@ -121,13 +121,13 @@ if [[ $flag_manifests == "Y" ]]; then
 		chunk1="*sample_name\tsample_title\tbioproject_accession\t*organism\tstrain\tisolate\thost"
 		chunk2="isolation_source\t*collection_date\t*geo_loc_name\t*sample_type\taltitude\tbiomaterial_provider\tcollected_by\tculture_collection\tdepth\tenv_broad_scale"
 		chunk3="genotype\thost_tissue_sampled\tidentified_by\tlab_host\tlat_lon\tmating_type\tpassage_history\tsamp_size\tserotype"
-		chunk4="serovar\tspecimen_voucher\ttemp\tdescription"
+		chunk4="serovar\tspecimen_voucher\ttemp\tdescription\tMLST"
 		echo -e "${chunk1}\t${chunk2}\t${chunk3}\t${chunk4}" > $ncbi_attributes
 
 		# Create manifest for metadata upload
 		chunk1="sample_name\tlibrary_ID\ttitle\tlibrary_strategy\tlibrary_source\tlibrary_selection"
 		chunk2="library_layout\tplatform\tinstrument_model\tdesign_description\tfiletype\tfilename"
-		chunk3="filename2\tfilename3\tfilename4\tassembly\tfasta_file\tMLST"
+		chunk3="filename2\tfilename3\tfilename4\tassembly\tfasta_file"
 		echo -e "${chunk1}\t${chunk2}\t${chunk3}" > $ncbi_metadata
 
 		# process samples
@@ -182,6 +182,9 @@ if [[ $flag_manifests == "Y" ]]; then
 
 				# add output variables to attributes file
 				echo -e "${chunk1}\t${chunk2}\t${chunk3}" >> $ncbi_metadata
+
+				# check
+				echo "Found metadata $id"
 	    	else
 	    		echo "Missing metadata $id"
 	    	fi
@@ -207,10 +210,10 @@ if [[ $flag_fastqs == "Y" ]]; then
 			R2="$fastq_dir/$id*R2*"
 
 			# check R1
-			if [[ $R1 ]]; then cp $R1 $batch_dir; else echo "MISSING FASTQ FILE: $R1"; fi
+			if [[ ! -f "$batch_dir/$id*R1*" ]]; then cp $R1 $batch_dir; else echo "MISSING FASTQ FILE: $R1"; fi
 
 			# check R2
-			if [[ $R2 ]]; then cp $R2 $batch_dir; else echo "MISSING FASTQ FILE: $R2"; fi
+			if [[ ! -f "$batch_dir/$id*R2*" ]]; then cp $R2 $batch_dir; else echo "MISSING FASTQ FILE: $R2"; fi
 		done
 	done
 fi
@@ -244,6 +247,7 @@ if [[ "$flag_precheck" == "Y" ]]; then
 		done
 	done
 	echo "-----READY FOR UPLOAD"
+	echo "$batch_dir"
 fi
 
 if [[ "$flag_post" == "Y" ]]; then
@@ -257,6 +261,8 @@ if [[ "$flag_post" == "Y" ]]; then
 
 	batch_count=`ls $ncbi_dir/*/manifest_batch_* | wc -l`
 	batch_min=1
+	cp srr_db/srr_db_master.csv srr_db/srr_db_backup.csv
+	cp srr_db/srr_db_backup.csv srr_db/srr_db_tmp.csv
 	
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
 		batch_dir="$ncbi_dir/batch_0$batch_id"
@@ -273,14 +279,17 @@ if [[ "$flag_post" == "Y" ]]; then
 			# create list of samples uploaded to ncbi
 			wgsID=`cat $wgs_results | grep $id | awk -F"," '{print $2}'`
 			sraID=`cat $ncbi_output | grep $wgsID | awk '{print $1}'`
-			if [[ $sraID == "" ]]; then sraID="NO_ID"; fi
-
-			# add to final output
-			echo "$sraID,$wgsID,$project_id" >> srr_db/srr_db_tmp.csv
+			if [[ $sraID == "" ]]; then 
+				sraID="NO_ID"
+			else
+				# add to final output
+				echo "$sraID,$wgsID,$project_id" >> srr_db/srr_db_tmp.csv
+			fi			
+			
 			echo "$wgsID,$sraID" >> $ncbi_results
 		done
 	done
 
-	head $ncbi_results
+	cat $ncbi_results
 	mv srr_db/srr_db_tmp.csv srr_db/srr_db_master.csv
 fi

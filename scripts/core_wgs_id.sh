@@ -6,6 +6,7 @@ output_dir=$1
 project_name_full=$2
 wgs_results=$3
 pipeline_results=$4
+pipeline_log=$5
 
 ##########################################################
 # Eval, source
@@ -59,13 +60,14 @@ if [[ $flag_ids == "Y" ]]; then
             echo "--sample: $sample_id"
 
             # check the QC status of the sample
-            check=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $2}'`
+            check=`cat $pipeline_results | grep $sample_id | cut -f2 -d";"`
 
             # if the sample passed QC, assign a WGS ID
             if [[ $check == "PASS" ]]; then
 
                 # then, check if sample already has an ID
                 check=`cat $cached_db | grep "$sample_id"`
+
                 # if the check passes, add new ID
                 if [[ $check == "" ]]; then
                     echo "----assigning new ID"
@@ -74,12 +76,12 @@ if [[ $flag_ids == "Y" ]]; then
                     # WGSID,CGR_ID,projectID,DATE_ASSIGNED
                     # YYYY-GZ-0001
                     if [[ $first_grab == "Y" ]]; then
-                        echo "--pulling ID from cache"
+                        echo "----pulling ID from cache"
                         sed -i '/^$/d' $cached_db
                         last_saved_id=`tail -n1 $cached_db | awk -F"," '{print $1}' | cut -f2 -d"-"`
-                        echo "last saved: $last_saved_id"
+                        echo "----last saved: $last_saved_id"
                         stripped_id=`echo "${last_saved_id#"${last_saved_id%%[!0]*}"}"`
-                        echo "stripped $stripped_id"
+                        echo "----stripped $stripped_id"
                         new_id=$(( stripped_id + 1 ))
                         first_grab="N"
                     fi
@@ -107,8 +109,11 @@ if [[ $flag_ids == "Y" ]]; then
                     final_id=`echo $check |cut -f1 -d","`
                     echo -e "$sample_id,$final_id" >> $wgs_results
                 fi
-            else
-                echo "--failed: $check"
+            elif [[ $check == "FAIL" ]]; then
+                echo "---- Pipe $check"
+                echo -e "$sample_id,NO_ID" >> $wgs_results
+            elif [[ $check == "" ]]; then
+                echo "---- Seq FAIL"
                 echo -e "$sample_id,NO_ID" >> $wgs_results
             fi
         fi

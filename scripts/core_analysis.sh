@@ -37,7 +37,7 @@ elif [[ $subworkflow == "ALL" ]]; then
 elif [[ $subworkflow == "lala" ]]; then
 	flag_post="Y"
 else
-	echo "CHOOSE CORRECT FLAG -s: DOWNLOAD BATCH ANALYZE REPORT ID CLEAN ALL"
+	echo "CHOOSE CORRECT FLAG -s: BATCH ANALYZE CLEAN POST ALL"
 	echo "YOU CHOOSE: $subworkflow"
 	EXIT
 fi
@@ -361,6 +361,8 @@ if [[ $flag_post == "Y" ]]; then
 	sed -i "s/\t/;/g" $pipeline_results
 
 	# review synopsis and determine status
+	cat $pipeline_results | awk -F";" '{print $1}' | uniq > processed_samples
+	IFS=$'\n' read -d '' -r -a sample_list < processed_samples
 	for sample_id in "${sample_list[@]}"; do
 		# pull only ID
 		sample_id=$(clean_file_names $sample_id)
