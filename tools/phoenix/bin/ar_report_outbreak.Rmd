@@ -349,7 +349,7 @@ heatmaply(snpData,
 ### Phylogenetic Tree
 
 ```{r treeparams}
-if(exists('treepath')){
+if(exists('treepath') & !is.null(ape::read.tree(treepath))){
   set.seed(42)
   tree <- ape::read.tree(treepath)
   if(exists('cgstats')){

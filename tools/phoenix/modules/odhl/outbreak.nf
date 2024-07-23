@@ -20,20 +20,7 @@ process OUTBREAK_REPORT {
     path('*.html')           , emit: report
 
   script:
-  """  
-  
-  # Run script
-  Rscript $Rscript
-
-  library(rmarkdown)
-  
-  # Function to knit R Markdown file
-  knit_report <- function(report_file) {
-    render(report_file, output_format = 'flexdashboard::flex_dashboard')
-    }
-    
-    # Render R Markdown report
-    knit_report('${Rscript}')
-
+  """
+  Rscript -e 'rmarkdown::render("${Rscript}", output_file="final.html", output_dir = getwd())'
   """
 }
