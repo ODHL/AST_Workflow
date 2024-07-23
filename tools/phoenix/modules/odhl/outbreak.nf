@@ -21,6 +21,6 @@ process OUTBREAK_REPORT {
 
   script:
   """
-  Rscript -e 'rmarkdown::render("${Rscript}", output_file="final.html", output_dir = getwd())'
+  Rscript -e 'rmarkdown::render("${Rscript}", output_file="outbreak.html", output_dir = getwd())'
   """
 }

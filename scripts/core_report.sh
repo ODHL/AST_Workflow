@@ -234,7 +234,15 @@ if [[ $flag_nf == "Y" ]]; then
 
     # create report
     samplesheet=$log_dir/manifests/samplesheet_gff.csv	
-	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --type outbreak --outdir $output_dir --projectID $project_name -with-conda"
+	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --type outbreak --outdir $output_dir/ --projectID $project_name -with-conda"
     echo $pipeline_full_cmd
     $pipeline_full_cmd
+
+    if [[ -f $output_dir/outbreak/outbreak.html ]]; then
+        cp $output_dir/outbreak/outbreak.html $output_dir/analysis/reports/
+        rm -rf $output_dir/outbreak $output_dir/pipeline_info
+        echo "** PIPELINE REPORT SUCCESSFUL **"
+    else
+        echo "** PIPELINE REPORT FAILED **"
+    fi
 fi

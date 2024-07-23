@@ -202,7 +202,7 @@ elif [[ "$pipeline" == "init" ]]; then
         for f in "${files_save[@]}"; do 
                 cp "tools/phoenix/bin/$f" "$analysis_dir/reports/"
                 sed -i "s/REP_PROJID/$project_name/g" $analysis_dir/reports/$f
-                sed -i "s/REP_OBID/$project_name/g" $analysis_dir/reports/$f
+                sed -i "s/REP_OB/$project_name/g" $analysis_dir/reports/$f
                 sed -i "s~REP_DATE~$todaysdate~g" $analysis_dir/reports/$f
         done
 
