@@ -8,17 +8,16 @@ output:
       - { title: "ODHL", href:
       "https://odh.ohio.gov/know-our-programs/microbiology/microbiology",
       align_right}
-    logo: "REP_LOGO"
+    logo: "odh_logo_240128.png"
 params:
-  configFILE: "REP_CONFIG"
+  configFILE: "config_ar_report.yaml"
+  sampletable: "final_report.csv"
+  snpmatrix: "snp_distance_matrix.tsv"
+  tree: "core_genome.tree"
+  cgstats: "core_genome_statistics.txt"
+  arpredictions: "ar_predictions.tsv"
   projectname: "REP_PROJID"
-  outdir: "REP_OUT"
   date: "REP_DATE"
-  sampletable: "REP_ST"
-  snpmatrix: "REP_SNP"
-  tree: "REP_TREE"
-  cgstats: "REP_CORE"
-  arpredictions: "REP_AR"
   testing: "N"
 editor_options: 
   chunk_output_type: console
@@ -57,7 +56,6 @@ reporttype="Standard"
 #position args
 if (params$testing=="N"){
   projectname=params$projectname
-  outdir=params$outdir
   configFILE=params$configFILE
   date=params$date
   sampletable=params$sampletable
@@ -102,8 +100,11 @@ methodsTEXT <- config$methods.text
 sampleDF <- read.csv2(sampletable,sep=",")
 rownames(sampleDF)=sampleDF$specimen_id
 
+# get tree
+treepath <- tree
+
 # get cgstats
-if(exists(cgstats)){cgstats <- read.csv2(cgstats,sep='\t',header = FALSE)}
+cgstats <- read.csv2(cgstats,sep='\t',header = FALSE)
 
 # get ar-summary
 ar_summary <- read.csv2(arpredictions,sep='\t',check.names = F)
@@ -389,7 +390,7 @@ if(exists(snpmatrix)){
 ### Phylogenetic Tree
 
 ```{r}
-if(exists(tree)){
+if(exists('treepath') & !is.null(ape::read.tree(treepath))){
   
   # get tree
   treepath <- tree
@@ -422,7 +423,7 @@ if(exists(tree)){
 
 A phylogeny tree is used to illustrate relationships where a simulation of continuous trait evolution is illustrated (Brownian motion BM model). The "trait value" refers to the values of the simulated continuous trait for each tip (or node). The length of each branch is representative of lineage relatedness.
 ```{r}
-if(exists(tree)){
+if(exists('treepath') & !is.null(ape::read.tree(treepath))){
   x<-fastBM(tree)
   obj<-contMap(tree,x)
 }
@@ -432,7 +433,7 @@ if(exists(tree)){
 
 A cladogram is used to illustrate relationships, where nodes are labeled with degree of similarity, but where the vertical lines are not representative of lineage relatedness.
 ```{r tree, message=FALSE}
-if(exists(tree)){
+if(exists('treepath') & !is.null(ape::read.tree(treepath))){
   #https://yulab-smu.top/treedata-book/chapter9.html
   # create basic tree with equal lengths
   p=ggtree(tree,branch.length="none")+  layout_dendrogram()
@@ -464,7 +465,7 @@ if(exists(tree)){
 #### Morphospace
 Expanding on the evolutionary relatedness, a multi-dimensional space is created to illustrated how closely related species tend to cluster together in morphospace. This reflects the phylogenetic signal in the morphological data, showing how traits have evolved in a manner that is correlated with the species' evolutionary history.
 ```{r}
-if(exists(tree)){
+if(exists('treepath') & !is.null(ape::read.tree(treepath))){
   tree_morph=ape::read.tree(treepath)
   ids=tree_morph$tip.label
   DT::datatable(data.frame(ID=c(1:length(ids)),

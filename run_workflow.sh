@@ -196,16 +196,6 @@ elif [[ "$pipeline" == "init" ]]; then
 	#update metadata name
         sed -i "s~METADATAFILE~${log_dir}/manifests/${project_name}_AR.csv~" "${log_dir}/config/config_pipeline.yaml"
 
-        # update reports
-        todaysdate=$(date '+%Y-%m-%d')
-        files_save=(ar_report_outbreak.Rmd ar_report_basic.Rmd)
-        for f in "${files_save[@]}"; do 
-                cp "tools/phoenix/bin/$f" "$analysis_dir/reports/"
-                sed -i "s/REP_PROJID/$project_name/g" $analysis_dir/reports/$f
-                sed -i "s/REP_OB/$project_name/g" $analysis_dir/reports/$f
-                sed -i "s~REP_DATE~$todaysdate~g" $analysis_dir/reports/$f
-        done
-
   	#output
         echo "------------------------------------------------------------------------"
 	echo "--- INITIALIZATION COMPLETE ---"

@@ -30,7 +30,7 @@ if (params.coverage < 30) { exit 1, 'The minimum coverage allowed for QA/QC purp
 */
 include { BUILD_TREE                } from './workflows/build_tree'
 include { PHOENIX_ODHL_EX           } from './workflows/phoenix_odhl'
-include { CREATE_REPORT                    } from './workflows/reports'
+include { CREATE_REPORT             } from './workflows/reports'
 // include { PHOENIX_EXTERNAL       } from './workflows/phoenix'
 // include { PHOENIX_EXQC           } from './workflows/cdc_phoenix'
 // include { SCAFFOLDS_EXTERNAL     } from './workflows/scaffolds'
@@ -121,14 +121,25 @@ workflow TREE {
 //
 // WORKFLOW: Create report
 //
-workflow REPORT {
+workflow OUTBREAK {
     if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry PHOENIX: Input samplesheet not specified!' }
 
     main:
-        CREATE_REPORT( ch_input )
+        CREATE_REPORT( ch_input, "outbreak" )
 
     emit:
-        report_outbreak            = CREATE_REPORT.out.report_outbreak
+        report_outbreak            = CREATE_REPORT.out.report_out
+
+}
+
+workflow BASIC {
+    if (params.input) { ch_input = file(params.input) } else { exit 1, 'For -entry PHOENIX: Input samplesheet not specified!' }
+
+    main:
+        CREATE_REPORT( ch_input, "basic" )
+
+    emit:
+        report_basic            = CREATE_REPORT.out.report_out
 
 }
 

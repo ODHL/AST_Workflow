@@ -361,9 +361,10 @@ if [[ $flag_post == "Y" ]]; then
 	sed -i "s/\t/;/g" $pipeline_results
 
 	# review synopsis and determine status
-	cat $pipeline_results | awk -F";" '{print $1}' | uniq > processed_samples
+	cat $pipeline_results | awk -F";" '{print $1}' | grep -v "ID" | uniq > processed_samples
 	IFS=$'\n' read -d '' -r -a sample_list < processed_samples
 	for sample_id in "${sample_list[@]}"; do
+		
 		# pull only ID
 		sample_id=$(clean_file_names $sample_id)
 
@@ -376,9 +377,10 @@ if [[ $flag_post == "Y" ]]; then
 
 		# review lab results
 		labValue=`cat $lab_results | grep $sample_id | cut -f2 -d";"`
-		pipelineValue=`cat $phoenix_results | grep $sample_id | cut -f9 -d";"`
-		pipelineStatus=`cat $phoenix_results | grep $sample_id | cut -f2 -d";"`
+		pipelineValue=`cat $phoenix_results | grep $sample_id | awk -F"\t" '{print $9}'`
+		pipelineStatus=`cat $phoenix_results | grep $sample_id | awk -F"\t" '{print $2}'`
 
+		# message if the lab didnt give results
 		if [[ $labValue == "" ]]; then echo "Missing lab value: $sample_id"; fi
 
 		# update the results and reasons
@@ -396,7 +398,6 @@ if [[ $flag_post == "Y" ]]; then
 				cp $pipeline_results $tmp_file
 			fi
 		fi
-		# head $pipeline_results
 
 		# set taxonomy
         Species=`cat $phoenix_results | awk -F"\t" -v i=$SID 'FNR == i {print $9}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
@@ -433,7 +434,7 @@ if [[ $flag_post == "Y" ]]; then
 	mv $mlst_file $pipeline_results
 
 	# stats
-	head $pipeline_results; echo; echo;
+	head -n 2 $pipeline_results; echo; echo;
 	num_samples=`cat $pipeline_results | wc -l`
 	num_discordance=`cat $pipeline_results | grep "Discordance" | wc -l`
 	num_concordant=`cat $pipeline_results | grep "PASS" | wc -l`

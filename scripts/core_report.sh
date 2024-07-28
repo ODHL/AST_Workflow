@@ -49,42 +49,44 @@ project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
 
 # set cmd
 analysis_cmd=$config_analysis_cmd
-analysis_cmd_trailing=$config_report_cmd_trailing
 ##########################################################
 # Set flags
 #########################################################
 flag_basic="N"
 flag_outbreak="N"
-flag_novel="N"
-flag_regional="N"
-flag_time="N"
 
 if [[ $subworkflow == "BASIC" ]]; then
     flag_basic="Y"
+    analysis_cmd_trailing=$config_basic_report_cmd_trailing
 elif [[ $subworkflow == "OUTBREAK" ]]; then
     flag_outbreak="Y"
-elif [[ $subworkflow == "NOVEL" ]]; then
-    flag_novel="Y"
-elif [[ $subworkflow == "REGIONAL" ]]; then
-    flag_regional="Y"
-elif [[ $subworkflow == "TIME" ]]; then
-    flag_time="Y"
-elif [[ $subworkflow == "NF" ]]; then
-    flag_nf="Y"
+    analysis_cmd_trailing=$config_outbreak_report_cmd_trailing
 else
     echo "Check report type selected: $subworkflow"
-    echo "Must be BASIC OUTBREAK NOVEL REGIONAL TIME"
+    echo "Must be BASIC OUTBREAK"
     exit
 fi
+
+##########################################################
+# update reports
+#########################################################
+todaysdate=$(date '+%Y-%m-%d')
+files_save=(ar_report_outbreak.Rmd ar_report_basic.Rmd)
+for f in "${files_save[@]}"; do 
+    cp "tools/phoenix/bin/$f" "$analysis_dir/reports/"
+    sed -i "s/REP_PROJID/$project_name/g" $analysis_dir/reports/$f
+    sed -i "s/REP_OB/$project_name/g" $analysis_dir/reports/$f
+    sed -i "s~REP_DATE~$todaysdate~g" $analysis_dir/reports/$f
+done
 
 ##########################################################
 # Run analysis
 #########################################################    
 if [[ $flag_basic == "Y" ]]; then
+    message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--BASIC REPORT to NF"
 	message_cmd_log "------------------------------------------------------------------------"
-	message_cmd_log "--BASIC REPORT"
-	message_cmd_log "------------------------------------------------------------------------"
-    
+        
     # read in final report; create sample list
     IFS=$'\n' read -d '' -r -a sample_list < $sample_ids
     
@@ -165,57 +167,33 @@ if [[ $flag_basic == "Y" ]]; then
     	
         # create all genes output file
 		if [[ $Auto_QC_Outcome == "PASS" ]]; then
-            cat $output_dir/tmp/amr/${sample_id}_all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' $f | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence">> $merged_prediction
+            cat $output_dir/tmp/amr/${sample_id}_all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence">> $merged_prediction
         fi
+
     done
     
-    # set up reports
-    arRMD="$analysis_dir/reports/ar_report_basic.Rmd"
-    cp scripts/ar_report_basic.Rmd $arRMD
-    cp assets/$config_logo_file $analysis_dir/reports
-
-    # prepare report
-    micropath="L://Micro/WGS/AR WGS/projects/$project_name"
-    prepREPORT "$micropath"
-
     # run multiQC
 	runMULTIQC
-
     if [[ -f $qc_report ]] & [[ ! -f $output_dir/fastq.tar.gz ]]; then
         tar -zcvf $output_dir/fastq.tar.gz $output_dir/tmp/rawdata/fastq
     fi
+    
+    # create report
+    samplesheet=$log_dir/manifests/samplesheet_gff.csv	
+	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --outdir $output_dir/ --projectID $project_name -with-conda"
+    echo $pipeline_full_cmd
+    $pipeline_full_cmd
 
-    head $final_results
+    if [[ -f $output_dir/basic/basic.html ]]; then
+        cp $output_dir/basic/basic.html $output_dir/analysis/reports/
+        rm -rf $output_dir/basic $output_dir/pipeline_info
+        echo "** PIPELINE REPORT SUCCESSFUL **"
+    else
+        echo "** PIPELINE REPORT FAILED **"
+    fi
 fi
 
 if [[ $flag_outbreak == "Y" ]]; then    
-    message_cmd_log "------------------------------------------------------------------------"
-	message_cmd_log "--OUTBREAK REPORT"
-	message_cmd_log "------------------------------------------------------------------------"
-    
-    # read in final report; create sample list
-    IFS=$'\n' read -d '' -r -a sample_list < $sample_ids
-
-    # generate predictions file
-    echo -e "Sample \tGene \tCoverage \tIdentity" > $merged_prediction
-
-    # create final result file    
-    for sample_id in "${sample_list[@]}"; do
-		check=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $2}'`
-        cat $output_dir/tmp/amr/${cleanid}*all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' $f | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence">> $merged_prediction
-	done
-
-    # set up reports
-    arRMD="$analysis_dir/reports/ar_report_outbreak.Rmd"
-    cp scripts/ar_report_outbreak.Rmd $arRMD
-    cp assets/$config_logo_file $analysis_dir/reports
-
-    # prepare report
-    micropath="L://Micro/WGS/AR WGS/_outbreak/$OBID/$project_name"
-    prepREPORT
-fi
-
-if [[ $flag_nf == "Y" ]]; then    
     message_cmd_log "------------------------------------------------------------------------"
 	message_cmd_log "--OUTBREAK REPORT to NF"
 	message_cmd_log "------------------------------------------------------------------------"
@@ -234,7 +212,7 @@ if [[ $flag_nf == "Y" ]]; then
 
     # create report
     samplesheet=$log_dir/manifests/samplesheet_gff.csv	
-	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --type outbreak --outdir $output_dir/ --projectID $project_name -with-conda"
+	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --outdir $output_dir/ --projectID $project_name -with-conda"
     echo $pipeline_full_cmd
     $pipeline_full_cmd
 

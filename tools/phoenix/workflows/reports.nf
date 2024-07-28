@@ -25,15 +25,15 @@ def multiqc_report = []
 ========================================================================================
 */
 
-include { OUTBREAK_REPORT                       } from '../modules/odhl/outbreak' // Run CFSAN-SNP Pipeline
-//include { BASIC                       } from '../modules/odhl/basic' // Run CFSAN-SNP Pipeline
+include { OUTBREAK_REPORT                       } from '../modules/odhl/ar_outbreak' // Run CFSAN-SNP Pipeline
+include { BASIC_REPORT                          } from '../modules/odhl/ar_basic' // Run CFSAN-SNP Pipeline
 
 /*
 ========================================================================================
     IMPORT LOCAL SUBWORKFLOWS
 ========================================================================================
 */
-include { INPUT_CHECK                    } from '../subworkflows/odhl/input_check_tree'
+include { INPUT_CHECK                          } from '../subworkflows/odhl/input_check_tree'
 
 /*
 ========================================================================================
@@ -73,24 +73,45 @@ def create_empty_ch(input_for_meta) { // We need meta.id associated with the emp
 workflow CREATE_REPORT {
     take:
         ch_input
+        type
 
     main:
         // Generate OUTBREAK REPORT
-        OUTBREAK_REPORT (
-            params.projectID,
-            params.outbreakScript,
-            params.logoFile,
-            params.ar_predictions,
-            params.core_stats,
-            params.snp_dist,
-            params.core_tree,
-            params.ar_config,
-            params.metadata,
-            params.pipe_report
-        )
+        if (type == "outbreak"){
+            OUTBREAK_REPORT (
+                params.projectID,
+                params.outbreakScript,
+                params.logoFile,
+                params.ar_predictions,
+                params.core_stats,
+                params.snp_dist,
+                params.core_tree,
+                params.ar_config,
+                params.metadata,
+                params.pipe_report
+            )
+            ch_output=OUTBREAK_REPORT.out.report
+        }
+        
+        // Generate BASIC REPORT
+        if (type == "basic"){
+            BASIC_REPORT(
+                params.projectID,
+                params.basicScript,
+                params.logoFile,
+                params.ar_predictions,
+                params.core_stats,
+                params.snp_dist,
+                params.core_tree,
+                params.ar_config,
+                params.metadata,
+                params.pipe_report
+            )
+            ch_output=BASIC_REPORT.out.report
+        }
 
     emit:
-        report_outbreak            = OUTBREAK_REPORT.out.report
+        report_out            = ch_output
 }
 
 /*
