@@ -15,7 +15,6 @@ process CFSAN {
   // cfsan requires each sample to be in a subfolder
   script:
   """
-
   cfsan_snp_pipeline run ${db} -c ${config} -o . -s $inputdir
   """
 }
