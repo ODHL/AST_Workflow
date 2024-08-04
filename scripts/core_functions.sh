@@ -66,8 +66,13 @@ makeDirs(){
 }
 
 runMULTIQC(){
+	multiqc_config=$log_dir/config/config_multiqc.yaml
+   fastqc_dir=$output_dir/tmp/qc/data
+   qcreport_dir=$output_dir/tmp/qc
+   multiqc_log=$log_dir/pipeline_log.txt
 	qc_report=$report_dir/multiqc_report.html
-	if [[ ! -f $qc_report ]]; then
+
+   if [[ ! -f $qc_report ]]; then
         multiqc -f -v \
         -c $multiqc_config \
         $fastqc_dir \

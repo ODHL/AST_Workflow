@@ -15,7 +15,6 @@ pipeline_results="${10}"
 #########################################################
 # Pipeline controls
 ########################################################
-flag_download="N"
 flag_batch="N"
 flag_analysis="N"
 flag_cleanup="N"
@@ -34,8 +33,6 @@ elif [[ $subworkflow == "ALL" ]]; then
 	flag_analysis="Y"
 	flag_post="Y"
 	flag_cleanup="Y"
-elif [[ $subworkflow == "lala" ]]; then
-	flag_post="Y"
 else
 	echo "CHOOSE CORRECT FLAG -s: BATCH ANALYZE CLEAN POST ALL"
 	echo "YOU CHOOSE: $subworkflow"
@@ -58,7 +55,6 @@ manifest_dir=$log_dir/manifests
 pipeline_dir=$output_dir/tmp/pipeline
 intermed_dir=$analysis_dir/intermed
 qc_dir=$tmp_dir/qc/data
-ncbi_dir=$tmpdir/ncbi/data
 gff_dir=$tmp_dir/gff
 amr_dir=$tmp_dir/amr
 dl_dir=$tmp_dir/rawdata/download
@@ -204,9 +200,9 @@ fi
 # Analysis
 #############################################################################################
 # determine number of batches
-batch_count=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
-batch_min=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
 if [[ $flag_analysis == "Y" ]]; then
+	batch_count=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
+	batch_min=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
 	
 	#############################################################################################
 	# LOG INFO TO CONFIG
@@ -363,7 +359,9 @@ if [[ $flag_post == "Y" ]]; then
 	# review synopsis and determine status
 	cat $pipeline_results | awk -F";" '{print $1}' | grep -v "ID" | uniq > processed_samples
 	IFS=$'\n' read -d '' -r -a sample_list < processed_samples
+	
 	for sample_id in "${sample_list[@]}"; do
+		echo $sample_id
 		
 		# pull only ID
 		sample_id=$(clean_file_names $sample_id)
@@ -376,8 +374,8 @@ if [[ $flag_post == "Y" ]]; then
 		num_of_fails=`cat $synopsis | grep -v "completed as FAILED" | grep "FAILED" | wc -l`
 
 		# review lab results
-		labValue=`cat $lab_results | grep $sample_id | cut -f2 -d";"`
-		pipelineValue=`cat $phoenix_results | grep $sample_id | awk -F"\t" '{print $9}'`
+		labValue=`cat $lab_results | grep $sample_id | cut -f2 -d";" | sort | uniq`
+		pipelineValue=`cat $phoenix_results | grep $sample_id | awk -F"\t" '{print $9}' | sort | uniq`
 		pipelineStatus=`cat $phoenix_results | grep $sample_id | awk -F"\t" '{print $2}'`
 
 		# message if the lab didnt give results
@@ -392,7 +390,7 @@ if [[ $flag_post == "Y" ]]; then
 			if [[ $pipelineStatus == "PASS" && *"$pipelineValue" != *"$labValue"*  ]]; then
 				reason="Lab Discordance"
 				cat $phoenix_results | awk -F"\t" -v i=$SID -v reason="${reason}" 'BEGIN {OFS = FS} NR==i {$2="FAIL"; $24=reason}1' > $pipeline_results
-				echo "Lab Discordance: $reason"
+				echo "Lab Discordance: $pipelineValue versus $labValue"
 				exit
 			else
 				cp $pipeline_results $tmp_file
@@ -400,11 +398,11 @@ if [[ $flag_post == "Y" ]]; then
 		fi
 
 		# set taxonomy
-        Species=`cat $phoenix_results | awk -F"\t" -v i=$SID 'FNR == i {print $9}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
-        MLST_1=`cat $phoenix_results | awk -F"\t" -v i=$SID 'FNR == i {print $16}'| cut -f1 -d","`
-        MLST_Scheme_1=`cat $phoenix_results | awk -F"\t" -v i=$SID 'FNR == i {print $15}'`
-        MLST_2=`cat $phoenix_results | awk -F"\t" -v i=$SID 'FNR == i {print $18}'| cut -f1 -d","`
-        MLST_Scheme_2=`cat $phoenix_results | awk -F"\t" -v i=$SID 'FNR == i {print $17}'`
+        Species=`cat $phoenix_results | awk -F"\t" -v i=$sample_id 'FNR == i {print $9}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
+        MLST_1=`cat $phoenix_results | awk -F"\t" -v i=$sample_id 'FNR == i {print $16}'| cut -f1 -d","`
+        MLST_Scheme_1=`cat $phoenix_results | awk -F"\t" -v i=$sample_id 'FNR == i {print $15}'`
+        MLST_2=`cat $phoenix_results | awk -F"\t" -v i=$sample_id 'FNR == i {print $18}'| cut -f1 -d","`
+        MLST_Scheme_2=`cat $phoenix_results | awk -F"\t" -v i=$sample_id 'FNR == i {print $17}'`
         
 		# handle schemes that have parenthesis
         if [[ $MLST_Scheme_1 =~ "(" ]]; then MLST_Scheme_1=`echo $MLST_Scheme_1 | sed -E -n 's/.*\((.*)\).*$/\1/p'`; fi
@@ -434,11 +432,10 @@ if [[ $flag_post == "Y" ]]; then
 	mv $mlst_file $pipeline_results
 
 	# stats
-	head -n 2 $pipeline_results; echo; echo;
 	num_samples=`cat $pipeline_results | wc -l`
 	num_discordance=`cat $pipeline_results | grep "Discordance" | wc -l`
 	num_concordant=`cat $pipeline_results | grep "PASS" | wc -l`
 	num_failed=`cat $pipeline_results | grep -v "Discordance" | awk '{print $2}' | grep "FAIL" | wc -l`
 
 	echo "There are $num_samples samples | Lab: $num_concordant (concordant) vs $num_discordance (discordant), $num_failed were failures."
-fi
+fi 

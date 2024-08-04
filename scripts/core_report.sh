@@ -5,11 +5,9 @@ output_dir=$1
 project_name_full=$2
 pipeline_results=$3
 wgs_results=$4
-ncbi_results=$5
-subworkflow=$6
-pipeline_config=$7
-pipeline_log=$8
-OBID=$9
+subworkflow=$5
+pipeline_config=$6
+pipeline_log=$7
 
 ##########################################################
 # Eval, source
@@ -21,31 +19,18 @@ eval $(parse_yaml ${pipeline_config} "config_")
 # Set dirs, files, args
 #########################################################
 log_dir=$output_dir/logs
-
 analysis_dir=$output_dir/analysis
 intermed_dir=$analysis_dir/intermed
 report_dir=$analysis_dir/reports
 
-ncbi_dir=$output_dir/tmp/ncbi
-fastqc_dir=$output_dir/tmp/qc/data
-qcreport_dir=$output_dir/tmp/qc
-
 sample_ids=$output_dir/logs/manifests/sample_ids.txt
+project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
 
-merged_amr=$intermed_dir/core_amr_genes.tsv
-merged_tree=$intermed_dir/core_genome.tree
-merged_roary=$intermed_dir/core_genome_statistics.txt
-merged_snp=$intermed_dir/snp_distance_matrix.tsv
-
-multiqc_config=$log_dir/config/config_multiqc.yaml
-multiqc_log=$log_dir/pipeline_log.txt
 final_results=$report_dir/final_report.csv
 merged_prediction="$intermed_dir/ar_predictions.tsv"
 merged_snp="$intermed_dir/snp_distance_matrix.tsv"
 merged_tree="$intermed_dir/core_genome.tree"
 merged_cgstats="$intermed_dir/core_genome_statistics.txt"
-
-project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
 
 # set cmd
 analysis_cmd=$config_analysis_cmd
@@ -108,7 +93,7 @@ if [[ $flag_basic == "Y" ]]; then
         
         # check WGS ID, if available
         if [[ -f $wgs_results ]]; then 
-            wgs_id=`cat $wgs_results | grep $sample_id | awk -F"," '{print $2}'`
+            wgs_id=`cat $wgs_results | grep $sample_id | awk -F"," '{print $2}' | sort | uniq`
         else
             # outbreak samples will not have WGS run individually - pull projects that ID's were created
             wgs_id=`cat wgs_db/wgs_db_master.csv | grep $cleanid | awk -F"," '{print $1}'`
@@ -129,6 +114,7 @@ if [[ $flag_basic == "Y" ]]; then
         
         # determine row 
         SID=$(awk -F";" -v sid=$sample_id '{ if ($1 == sid) print NR }' $pipeline_results)
+        SID=`echo $SID | cut -d" " -f1`
 
         # pull metadata
         Auto_QC_Outcome=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $2}'`
@@ -147,8 +133,8 @@ if [[ $flag_basic == "Y" ]]; then
         # get MLST
         Species=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $9}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
         MLST_1=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $16}'| cut -f1 -d","`
-        MLST_Scheme_1=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $15}'`
-        MLST_2=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $18}'| cut -f1 -d","`
+        MLST_Scheme_1=`cat $pipeline_results | sort | uniq | awk -F";" -v i=$SID 'FNR == i {print $15}'`
+        MLST_2=`cat $pipeline_results | sort | uniq | awk -F";" -v i=$SID 'FNR == i {print $18}'| cut -f1 -d","`
         MLST_Scheme_2=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $17}'`
         sequence_classification=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $25}'`
         
@@ -173,13 +159,15 @@ if [[ $flag_basic == "Y" ]]; then
     done
     
     # run multiQC
-	runMULTIQC
-    if [[ -f $qc_report ]] & [[ ! -f $output_dir/fastq.tar.gz ]]; then
-        tar -zcvf $output_dir/fastq.tar.gz $output_dir/tmp/rawdata/fastq
+	if [[ ! -f $qc_report ]]; then
+        runMULTIQC
+    fi
+    if [[ -f $qc_report ]]; then
+        rm -rf $output_dir/tmp/rawdata/fastq
     fi
     
     # create report
-    samplesheet=$log_dir/manifests/samplesheet_gff.csv	
+    samplesheet=$log_dir/manifests/samplesheet_gff.csv
 	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --outdir $output_dir/ --projectID $project_name -with-conda"
     echo $pipeline_full_cmd
     $pipeline_full_cmd
@@ -206,12 +194,13 @@ if [[ $flag_outbreak == "Y" ]]; then
 
     # create final result file    
     for sample_id in "${sample_list[@]}"; do
-		check=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $2}'`
-        cat $output_dir/tmp/amr/${cleanid}*all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' $f | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence">> $merged_prediction
+        cleanid=`echo $sample_id | cut -f1 -d"-"`
+        echo "$cleanid"
+        cat $output_dir/tmp/amr/${cleanid}*all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence" >> $merged_prediction
 	done
 
     # create report
-    samplesheet=$log_dir/manifests/samplesheet_gff.csv	
+    samplesheet=$log_dir/manifests/samplesheet_gff.csv
 	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --outdir $output_dir/ --projectID $project_name -with-conda"
     echo $pipeline_full_cmd
     $pipeline_full_cmd

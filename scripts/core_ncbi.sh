@@ -257,7 +257,7 @@ if [[ "$flag_post" == "Y" ]]; then
 	
 	# prep results file
 	if [[ -f $ncbi_results ]]; then rm $ncbi_results; fi
-	echo "WGSID,SRRID" > $ncbi_results
+	echo "WGSID,SRRID,SAMID" > $ncbi_results
 
 	batch_count=`ls $ncbi_dir/*/manifest_batch_* | wc -l`
 	batch_min=1
@@ -279,14 +279,16 @@ if [[ "$flag_post" == "Y" ]]; then
 			# create list of samples uploaded to ncbi
 			wgsID=`cat $wgs_results | grep $id | awk -F"," '{print $2}'`
 			sraID=`cat $ncbi_output | grep $wgsID | awk '{print $1}'`
+			samID=`cat $ncbi_output | grep $wgsID | awk '{print $5}'`
 			if [[ $sraID == "" ]]; then 
 				sraID="NO_ID"
+				samID="NO_ID"
 			else
 				# add to final output
-				echo "$sraID,$wgsID,$project_id" >> srr_db/srr_db_tmp.csv
+				echo "$sraID,$wgsID,$samID,$project_id" >> srr_db/srr_db_tmp.csv
 			fi			
 			
-			echo "$wgsID,$sraID" >> $ncbi_results
+			echo "$wgsID,$sraID,$samID" >> $ncbi_results
 		done
 	done
 

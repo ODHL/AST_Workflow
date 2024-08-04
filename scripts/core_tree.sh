@@ -16,7 +16,6 @@ project_name_full=$8
 flag_prep="N"
 flag_analysis="N"
 flag_report="N"
-flag_cleanup="N"
 
 if [[ $subworkflow == "PREP" ]]; then
 	flag_prep="Y"
@@ -36,15 +35,12 @@ fi
 source $(dirname "$0")/core_functions.sh
 eval $(parse_yaml ${pipeline_config} "config_")
 
-project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
 #########################################################
 # Set dirs, files, args
 #########################################################
 # set dirs
 log_dir=$output_dir/logs
 tmp_dir=$output_dir/tmp
-analysis_dir=$output_dir/analysis
-manifest_dir=$log_dir/manifests
 pipeline_dir=$output_dir/tmp/pipeline/tree
 
 intermed_dir=$output_dir/analysis/intermed
@@ -54,8 +50,6 @@ gff_dir=$tmp_dir/gff
 
 # set variables
 ODH_version=$config_ODH_version
-phoenix_version=$config_phoenix_version
-dryad_version=$config_dryad_version
 
 # set files
 samplesheet=$log_dir/manifests/samplesheet_gff.csv	
@@ -94,12 +88,15 @@ if [[ $flag_prep == "Y" ]]; then
 
 	# create sample log by checking status
     for sample_id in ${sample_list[@]}; do
+		echo "$sample_id"
+		
 		# check the QC status of the sample
 		sample_id=$(clean_file_names $sample_id)
-        check=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $2}'`
-		
+        check=`cat $pipeline_results | sort | uniq | grep $sample_id | awk -F";" '{print $2}'`
+
         # if the sample passed QC, assign a WGS ID
         if [[ $check == "PASS" ]]; then
+			echo "--pass"
 			# set output dir
 			fq_dest="$tree_dir/input_dir/$sample_id"
 			if [[ ! -d $fq_dest ]]; then mkdir -p $fq_dest; fi
@@ -118,7 +115,7 @@ if [[ $flag_prep == "Y" ]]; then
 		fi
 	done
 
-	cat $samplesheet
+	cat $samplesheet | wc -l
 fi
 
 if [[ $flag_analysis == "Y" ]]; then

@@ -60,7 +60,7 @@ if [[ $flag_ids == "Y" ]]; then
             echo "--sample: $sample_id"
 
             # check the QC status of the sample
-            check=`cat $pipeline_results | grep $sample_id | cut -f2 -d";"`
+            check=`cat $pipeline_results | grep $sample_id | cut -f2 -d";" | sort | uniq`
 
             # if the sample passed QC, assign a WGS ID
             if [[ $check == "PASS" ]]; then
@@ -115,6 +115,8 @@ if [[ $flag_ids == "Y" ]]; then
             elif [[ $check == "" ]]; then
                 echo "---- Seq FAIL"
                 echo -e "$sample_id,NO_ID" >> $wgs_results
+            else
+                echo "Something is wrong"
             fi
         fi
     done

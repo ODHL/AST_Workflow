@@ -150,6 +150,9 @@ elif [[ "$pipeline" == "phaseO" ]]; then
         # run analysis
         bash run_workflow.sh -n $project_id -p analysis  -s ALL
 
+        # run analysis
+        bash run_workflow.sh -n $project_id -p wgs
+
         # run tree
         bash run_workflow.sh -n $project_id -p tree -s ALL 
 
@@ -266,11 +269,9 @@ elif [[ "$pipeline" == "report" ]]; then
                 $project_name_full \
                 $pipeline_results \
                 $wgs_results \
-                $ncbi_results \
                 $subworkflow \
                 $pipeline_config \
-                "${pipeline_log}" \
-                $outbreak_id
+                "${pipeline_log}"
 
 ######################## Run validation
 elif [[ "$pipeline" == "validation" ]]; then
