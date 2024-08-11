@@ -1,15 +1,20 @@
 # params
-batch_limit: 10
+batch_limit: 6
+kraken2_contamination_threshold: 20
 
 # tools
 basespace_cmd: "/home/ubuntu/tools/basespace"
-kraken2_db: "/home/ubuntu/workflows/SARS_CoV_2_Workflow/refs/kraken2db/"
+kraken2_db: "/home/ubuntu/refs/k2/k2_standard_08gb_20240112.tar.gz"
 nextflow_cmd: "/home/ubuntu/tools/nextflow"
 ar_dir: "/home/ubuntu/tools/ar_report_generator"
 
 # analysis commands
-analysis_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/AR_Workflow/tools/phoenix/main.nf"
-analysis_cmd_trailing: "-profile docker -entry PHOENIX --max_memory 7.GB --max_cpus 4"
+analysis_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/AST_Workflow/tools/phoenix/main.nf"
+analysis_cmd_trailing: "-profile docker -entry PHOENIX_ODHL --max_memory 7.GB --max_cpus 4"
+tree_cmd_trailing: "-profile docker -entry TREE --max_memory 7.GB --max_cpus 4"
+outbreak_report_cmd_trailing: "-profile docker -entry OUTBREAK --max_memory 7.GB --max_cpus 4"
+basic_report_cmd_trailing: "-profile docker -entry BASIC --max_memory 7.GB --max_cpus 4"
+dbs_cmd_trailing: "-profile docker -entry DBS --max_memory 7.GB --max_cpus 4"
 
 # ref files
 ref_fasta: "/home/ubuntu/refs/ASM211692v1.fasta"
@@ -23,33 +28,31 @@ ARG_ANNOT: "Latest version NT v6 July 2019"
 ResFinder: "v2.1.0 including until 2023-04-12 commit f46d8fc"
 AMRFinder: "v2023-04-17.1"
 MLST: "pulled from from PubMLST.org 2023-05-02"
+config_MetaPhlAn_db: "mpa_vJun23_CHOCOPhlAnSGB_202307"
 
-wgsID_script: "/home/ubuntu/workflows/AR_workflow/scripts/core_wgs_id.sh"
 metadata_file: "METADATAFILE"
+
+logo_file: "odh_logo_240128.png"
+
+# percent ID for tree
+percent_id: "90"
 
 ###############################
 # PARAMS REQUIRED
 ###############################
-isolation_source: "BLOOD"
-MLST: "MLST#_Scheme"
-
 ################ NCBI (attributes)
 geo_loc_name: "USA"
 host: "Homo sapiens"
 sample_type: "whole organism"
 
-instrument_model: "GREP"
-filename: "R1"
-filename2: "R2"
 ################ NCBI (metadata)
 library_strategy: "WGS"
 library_source: "Genomic"
 library_selection: "Random"
 library_layout: "Paired"
 platform: "Illumina"
-design_description: "primers"
+design_description: "WGS by Illumina MiSeq using Illumina DNA Prep library prep"
 filetype: "fastq"
-
 
 ###############################
 # PARAMS Optional
@@ -76,5 +79,3 @@ specimen_voucher: ""
 strain: ""
 temp: ""
 description: ""
-
-################ NCBI (metadata)

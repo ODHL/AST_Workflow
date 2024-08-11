@@ -1,0 +1,329 @@
+---
+title: "Public Health Whole Genome Sequencing Analysis Report"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    navbar:
+      - { title: "ODHL", href:
+      "https://odh.ohio.gov/know-our-programs/microbiology/microbiology",
+      align_right}
+    logo: "odh_logo_240128.png"
+params:
+  configFILE: "config_ar_report.yaml"
+  sampletable: "final_report.csv"
+  snpmatrix: "snp_distance_matrix.tsv"
+  tree: "core_genome.tree"
+  cgstats: "core_genome_statistics.txt"
+  arpredictions: "ar_predictions.tsv"
+  metadata: "metadata.csv"
+  testing: "N"
+  obid: "REP_OB"
+  projectname: "REP_PROJID"
+  date: "REP_DATE"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r libs, echo=FALSE,include=FALSE,warning=FALSE,message=FALSE}
+library(rmarkdown)
+library(argparser)
+library(yaml)
+library(ape)
+library(ggplot2)
+library(plotly)
+library(pander)
+library(kableExtra)
+library(ape)
+library(ggtree)
+library(heatmaply)
+library(phytools)
+library(DT)
+library(RColorBrewer)
+library(ggpubr)
+library(flexdashboard)
+library(crosstalk)
+require(phytools)
+require(rgl)
+require(htmlwidgets)
+knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message=FALSE)
+options(rgl.useNULL = TRUE) # Suppress the separate window.
+'%ni%' <- function(x,y)!('%in%'(x,y))
+```
+
+```{r args, echo=FALSE,warning=FALSE}
+username="S. Chill"
+reporttype="Outbreak"
+
+#position args
+if (params$testing=="N"){
+  projectname=params$projectname
+  configFILE=params$configFILE
+  date=params$date
+  sampletable=params$sampletable
+  snpmatrix=params$snpmatrix
+  tree=params$tree
+  cgstats=params$cgstats
+  arpredictions=params$arpredictions
+  metadata=params$metadata
+  obid=params$obid
+} else {
+  projectname="OH-M6588-231201"
+  date="12/18/23"
+  sampletable="final_report.csv"
+  snpmatrix="snp_distance_matrix.tsv"
+  tree="core_genome.tree"
+  cgstats="core_genome_statistics.txt"
+  arpredictions="ar_predictions.tsv"
+  metadata="manifest.csv"
+}
+```
+
+```{r prep, echo=FALSE, warning=FALSE}
+# read yaml file
+config <- read_yaml(configFILE)
+
+## set header text
+subHeaderText = paste0(config$sub.title, ": ", reporttype)
+
+## get header table
+headerDF <- data.frame(date=date,ob=obid, project=projectname,name=username)
+
+## get summary text
+summaryTEXT <- config$summary.paragraph
+
+## get disclaimer text
+disclaimerTEXT <- config$disclaimer.text
+
+## get methods text
+methodsTEXT <- config$methods.text
+
+## get reference
+referenceTEXT <- config$reference.text
+```
+
+```{r read, echo=FALSE}
+## get sample table
+sampleDF <- read.csv2(sampletable,sep=",")
+rownames(sampleDF)=sampleDF$specimen_id
+
+# get metadata
+metadataDF = read.csv(metadata)
+
+# sampleDF and metadata  merge
+sampleDF=merge(sampleDF,metadataDF[,c("specimen_id","isolation_source",
+                                      "pt_county","healthcare_origin",
+                                      "submitter_name","collect_date")], 
+               by="specimen_id",all=TRUE)
+
+# replace NAs
+sampleDF$srr_id <- ifelse(sampleDF$srr_id == "NO_ID", sampleDF$specimen_id,
+                          sampleDF$srr_id)
+sampleDF$healthcare_origin[is.na(sampleDF$healthcare_origin)] <- "REF"
+
+# get heatmap
+snpData <- read.csv2(snpmatrix,sep='\t',check.names = F,row.names = 1)
+
+# get tree
+treepath <- tree
+
+# get cgstats
+cgstats <- read.csv2(cgstats,sep='\t',header = FALSE)
+
+# get ar-summary
+ar_summary <- read.csv2(arpredictions,sep='\t',check.names = F)
+ar_summary$Sample=gsub("_[0-9][0-9][0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary$Sample=gsub("_[0-9][0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary$Sample=gsub("_[0-9][0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary$Sample=gsub("_[0-9]_length_[0-9]*","",ar_summary$Sample)
+ar_summary=ar_summary[!duplicated(ar_summary),]
+
+# create metadata
+generate_ids=function(list_in){
+  tmp_list=which( colnames(sampleDF) %ni% list_in ) -1
+  return(tmp_list)
+}
+id_nums=generate_ids(c("auto_qc_outcome","specimen_id","lab_results",
+                       "srr_id","samn_id","wgs_id","mlst1","healthcare_origin"))
+tax_nums=generate_ids(c("specimen_id","species","sequence_classification",
+                        "mlst_1","gamma_beta_lactam_resistance_genes"))
+qc_nums=generate_ids(c("specimen_id","estimated_coverage","genome_length",
+                        "auto_qc_failure_reason"))
+ob_samples=subset(sampleDF,healthcare_origin!="REF")
+sample_meta=SharedData$new(ob_samples)
+```
+
+```{r summarytext, echo=FALSE}
+# generate summary test for outupt
+pass_n=nrow(subset(ob_samples, auto_qc_outcome=="PASS"))
+failed_n=nrow(subset(ob_samples, auto_qc_outcome!="PASS"))
+failed_samples=subset(ob_samples, auto_qc_outcome!="PASS")$specimen_id
+ref_samples=nrow(sampleDF)-nrow(ob_samples)
+summaryTEXT=paste0("There were ", nrow(ob_samples)," samples analyzed and ",
+                   pass_n, " samples passed quality control thresholds, while ",
+                   length(failed_samples)," failed. An additional ",ref_samples,
+                   " observational samples were used for reference.")
+if(failed_n>0){
+  summaryTEXT=paste0(summaryTEXT,
+                     " Failing samples included: ",
+                     paste(failed_samples,collapse=" | "),".")
+}
+```
+
+Information {data-orientation=columns data-icon="fa-info-circle"}
+=================================================================
+Column {data-width=600}
+-----------------------
+### `r subHeaderText` 
+```{r intro}
+# create table
+colnames(headerDF) <- c("REPORT DATE","OUTBREAK ID","PROJECT NAME","PREPARED BY")
+
+# plot table
+pander(headerDF)
+```
+
+### METHODS
+`r methodsTEXT`
+`r config$tree.text`
+`r if(exists('treepath') & exists('cgstats')){paste("Core Genes Identified: ",cgstats[cgstats$V1 == 'Core genes',3],'\n')}`
+`r if(exists('treepath') & exists('cgstats')){paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])}`
+
+Column {data-width=600}
+-----------------------
+### Summary
+`r summaryTEXT`
+
+`r referenceTEXT`
+
+### DISCLAIMER
+`r disclaimerTEXT`
+
+Analysis {data-orientation=columns data-icon="ion-search"}
+=================================================================
+
+```{r ids, echo=FALSE}
+sample_meta %>%
+  DT::datatable(
+    extensions = c("Buttons","Scroller"),
+    rownames=FALSE,
+    style="bootstrap",
+    width="100%",
+    class="compact",
+    options=list(
+      dom="Blrtrip",
+      deferREander=TRUE,
+      columnDefs=list(
+        list(
+          visible=FALSE,
+          targets=id_nums
+        )
+      ),
+      buttons = list(I("colvis"),"csv","excel")
+      ),
+    colnames = c(
+      "QC" = "auto_qc_outcome",
+      "eLIMS_ID" = "specimen_id",
+      "Lab_Results" = "lab_results",
+      "SRR_ID" = "srr_id",
+      "SAMN_ID" = "samn_id",
+      "WGS" = "wgs_id",
+      "MLST" = "mlst_1",
+      "healthcare_origin" = "healthcare_origin"
+    )
+  )
+```
+
+### Phylogenetic Tree
+
+```{r treeparams}
+if(exists('treepath') & !is.null(ape::read.tree(treepath))){
+  set.seed(42)
+  tree <- ape::read.tree(treepath)
+  
+  # rename the labels
+  count=1
+  for (id in tree$tip.label){
+    if (id %in% ob_samples$specimen_id){
+        next
+    } else{
+      tree$tip.label=gsub(id,paste0("ref",count),tree$tip.label)
+      count=count+1
+    }
+  }
+  
+  if(exists('cgstats')){
+    paste("Core Genes Identified: ",cgstats[cgstats$V1 == 'Core genes',3])
+    paste("Total Genes Identified: ",cgstats[cgstats$V1 == 'Total genes',3])
+  }
+
+  # set the root method
+  if(config$root.method == 'midpoint'){
+    tree <- midpoint.root(tree)
+  } else if(config$root.method == 'unrooted'){
+    tree <- tree
+  } else {
+    node <- match(config$root.method, tree$tip.label)
+    if(is.na(node)){
+      message('Root sample ID not found')
+      quit(save="no", status=1)
+    } else {
+      tree <- reroot(tree,node)
+    }
+  }
+}
+```
+
+#### Ancestrial Tree
+
+A phylogeny tree is used to illustrate relationships where a simulation of continuous trait evolution is illustrated (Brownian motion BM model). The "trait value" refers to the values of the simulated continuous trait for each tip (or node). The length of each branch is representative of lineage relatedness. 
+
+
+```{r treepruned}
+if(exists('treepath') & !is.null(ape::read.tree(treepath))){
+  x<-fastBM(tree)
+  obj<-contMap(tree,x)
+  plot(obj,type="fan",lwd=2,fsize=c(.8,.5))
+
+} else{
+  print("Not enough difference at 80% conformity")
+}
+```
+
+#### Cladogram
+
+A cladogram is used to illustrate relationships, where nodes are labeled with degree of similarity, but where the vertical lines are not representative of lineage relatedness.
+```{r tree, message=FALSE}
+#https://yulab-smu.top/treedata-book/chapter9.html
+# create basic tree with equal lengths
+if(exists('treepath') & !is.null(ape::read.tree(treepath))){
+  p=ggtree(tree,branch.length="none")+  layout_dendrogram()
+  strip=ggtree(tree,branch.length="none")
+
+  # pull data to create node labels
+  d <- p$data
+  bs <- d[!d$isTip,]
+  bs$label <- as.numeric(bs$label)
+  ggtree_plot <- p + 
+    geom_text(data=bs,aes(label=label,vjust=1.2),size=2)
+
+  # create df for labels
+  rownames(sampleDF)=sampleDF$specimen_id
+  sampleDF$ref <- as.integer(factor(sampleDF$healthcare_origin, 
+                                    levels = unique(sampleDF$healthcare_origin)))
+  labels=p$data$label[p$data$label %ni% bs$label]
+  d <- data.frame(label = labels, 
+                    ref  = sampleDF[labels, c("ref")],
+                    mlst = ifelse(is.na(sampleDF[labels, c("mlst_1")]),"Ref",
+                                  sampleDF[labels, c("mlst_1")]))
+
+  # plot graph
+  ggtree_plot %<+% d + 
+    layout_dendrogram()+  
+    geom_tippoint(aes(fill=factor(mlst), x=x+.5), 
+                  size=6, shape=21, color='black')+
+    geom_tiplab(aes(label=ref), size=2.5, offset=-.4,color='black')+
+    geom_tiplab(hjust=1, offset=-1.5, show.legend=FALSE)+
+    theme_dendrogram(plot.margin=margin(0,0,80,0))
+}
+```

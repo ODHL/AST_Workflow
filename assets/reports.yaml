@@ -1,0 +1,22 @@
+name: my_environment
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base=4.3
+  - r-argparser
+  - r-data.table
+  - r-dt
+  - r-flexdashboard
+  - r-ggplot2
+  - r-kableextra
+  - r-pander
+  - r-plotly
+  - r-rgl
+  - r-rmarkdown
+  - r-heatmaply
+  - r-phytools
+  - r-yaml
+  - bioconductor-ggtree=3.10.0
+  - r-ggpubr
