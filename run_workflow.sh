@@ -71,6 +71,7 @@ check_initialization(){
 }
 
 # source global functions
+source ~/.bashrc
 source $(dirname "$0")/scripts/core_functions.sh
 #############################################################################################
 # args
@@ -100,7 +101,6 @@ pipeline_results=$analysis_dir/intermed/pipeline_results_ar.tsv
 wgs_results=$analysis_dir/intermed/pipeline_results_wgs.tsv
 ncbi_results=$analysis_dir/intermed/pipeline_results_ncbis.csv
 
-final_results=$analysis_dir/reports/final_results_$today_date.csv
 pipeline_log=$log_dir/pipeline_log.txt
 multiqc_config="$log_dir/config/config_multiqc.yaml"
 pipeline_config="$log_dir/config/config_pipeline.yaml"

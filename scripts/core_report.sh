@@ -37,10 +37,13 @@ analysis_cmd=$config_analysis_cmd
 ##########################################################
 # Set flags
 #########################################################
+flag_report="N"
 flag_basic="N"
 flag_outbreak="N"
 
-if [[ $subworkflow == "BASIC" ]]; then
+if [[ $subworkflow == "REPORT" ]]; then
+    flag_report="Y"
+elif [[ $subworkflow == "BASIC" ]]; then
     flag_basic="Y"
     analysis_cmd_trailing=$config_basic_report_cmd_trailing
 elif [[ $subworkflow == "OUTBREAK" ]]; then
@@ -48,7 +51,7 @@ elif [[ $subworkflow == "OUTBREAK" ]]; then
     analysis_cmd_trailing=$config_outbreak_report_cmd_trailing
 else
     echo "Check report type selected: $subworkflow"
-    echo "Must be BASIC OUTBREAK"
+    echo "Must be REPORT BASIC OUTBREAK"
     exit
 fi
 
@@ -67,7 +70,7 @@ done
 ##########################################################
 # Run analysis
 #########################################################    
-if [[ $flag_basic == "Y" ]]; then
+if [[ $flag_report == "Y" ]]; then
     message_cmd_log "------------------------------------------------------------------------"
 	message_cmd_log "--BASIC REPORT to NF"
 	message_cmd_log "------------------------------------------------------------------------"
@@ -79,7 +82,7 @@ if [[ $flag_basic == "Y" ]]; then
     chunk1="specimen_id,wgs_id,srr_id,wgs_date_put_on_sequencer,sequence_classification,run_id"
     chunk2="auto_qc_outcome,estimated_coverage,genome_length,species,mlst_scheme_1"
     chunk3="mlst_1,mlst_scheme_2,mlst_2,gamma_beta_lactam_resistance_genes"
-    chunk4="auto_qc_failure_reason,lab_results"
+    chunk4="auto_qc_failure_reason,lab_results,samn_id"
     echo -e "${chunk1},${chunk2},${chunk3},${chunk4}" > $final_results 
     
     # generate predictions file
@@ -89,24 +92,18 @@ if [[ $flag_basic == "Y" ]]; then
     for sample_id in "${sample_list[@]}"; do
         sample_id=$(clean_file_names $sample_id)
         cleanid=`echo $sample_id | cut -f1 -d"-"`
-        echo $cleanid
-        
-        # check WGS ID, if available
-        if [[ -f $wgs_results ]]; then 
-            wgs_id=`cat $wgs_results | grep $sample_id | awk -F"," '{print $2}' | sort | uniq`
-        else
-            # outbreak samples will not have WGS run individually - pull projects that ID's were created
-            wgs_id=`cat wgs_db/wgs_db_master.csv | grep $cleanid | awk -F"," '{print $1}'`
-            if [[ $wgs_id == "" ]]; then wgs_id="WGS: NO_ID"; fi
-        fi
+        echo "--$cleanid"
 
-        # check NCBI, if available
-        if [[ $wgs_id != "NO_ID" ]]; then 
+        # check WGS ID, if available
+        if [[ $sample_id != *"SRR"* ]]; then
+            wgs_id=`cat $wgs_results | grep $sample_id | awk -F"," '{print $2}' | sort | uniq`
             srr_number=`cat srr_db/srr_db_master.csv | grep $wgs_id | awk -F"," '{print $1}'`
+            samn_number=`cat srr_db/srr_db_master.csv | grep $wgs_id | awk -F"," '{print $3}'`
         else
-            srr_number="NO_ID"
+            wgs_id="NO_ID"
+            srr_number="$sample_id"
+            samn_number="NO_ID"
         fi
-        if [[ $srr_number == "" ]]; then srr_number="SRR: NO_ID"; fi
         
         # set seq info
         wgs_date_put_on_sequencer=`echo $project_name | cut -f3 -d"-"`
@@ -129,15 +126,15 @@ if [[ $flag_basic == "Y" ]]; then
         echo "----$Auto_QC_Outcome"    
         echo "----$wgs_id"
         echo "----$srr_number"
+        echo "----$samn_number"
 
-        # get MLST
-        Species=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $9}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
+        # get MLST;u $9}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
         MLST_1=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $16}'| cut -f1 -d","`
         MLST_Scheme_1=`cat $pipeline_results | sort | uniq | awk -F";" -v i=$SID 'FNR == i {print $15}'`
         MLST_2=`cat $pipeline_results | sort | uniq | awk -F";" -v i=$SID 'FNR == i {print $18}'| cut -f1 -d","`
         MLST_Scheme_2=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $17}'`
         sequence_classification=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $25}'`
-        
+
         # set genes
         GAMMA_Beta_Lactam_Resistance_Genes=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $19}'`
         
@@ -148,16 +145,20 @@ if [[ $flag_basic == "Y" ]]; then
         chunk1="$sample_id,$wgs_id,$srr_number,$wgs_date_put_on_sequencer,\"${sequence_classification}\",$run_id"
         chunk2="$Auto_QC_Outcome,$Estimated_Coverage,$Genome_Length,"${Species}",$MLST_Scheme_1"
         chunk3="\"${MLST_1}\",$MLST_Scheme_2,\"${MLST_2}\",\"${GAMMA_Beta_Lactam_Resistance_Genes}\""
-        chunk4="\"${Auto_QC_Failure_Reason}\",\"${LabValidation}\""
+        chunk4="\"${Auto_QC_Failure_Reason}\",\"${LabValidation}\",\"${samn_number}\""
         echo -e "${chunk1},${chunk2},${chunk3},${chunk4}" >> $final_results
     	
         # create all genes output file
 		if [[ $Auto_QC_Outcome == "PASS" ]]; then
             cat $output_dir/tmp/amr/${sample_id}_all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence">> $merged_prediction
         fi
-
     done
-    
+
+    echo $final_results
+fi
+
+if [[ $flag_basic == "Y" ]]; then
+
     # run multiQC
 	if [[ ! -f $qc_report ]]; then
         runMULTIQC
@@ -167,6 +168,7 @@ if [[ $flag_basic == "Y" ]]; then
     fi
     
     # create report
+    source ~/.bashrc
     samplesheet=$log_dir/manifests/samplesheet_gff.csv
 	pipeline_full_cmd="$analysis_cmd $analysis_cmd_trailing --input $samplesheet --outdir $output_dir/ --projectID $project_name -with-conda"
     echo $pipeline_full_cmd
@@ -195,7 +197,6 @@ if [[ $flag_outbreak == "Y" ]]; then
     # create final result file    
     for sample_id in "${sample_list[@]}"; do
         cleanid=`echo $sample_id | cut -f1 -d"-"`
-        echo "$cleanid"
         cat $output_dir/tmp/amr/${cleanid}*all_genes.tsv | awk -F"\t" '{print $2"\t"$6"\t"$16"\t"$17}' | sed -s "s/_all_genes.tsv//g" | grep -v "_Coverage_of_reference_sequence" >> $merged_prediction
 	done
 

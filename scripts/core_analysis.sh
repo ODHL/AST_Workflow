@@ -344,16 +344,11 @@ if [[ $flag_post == "Y" ]]; then
 	message_cmd_log "--- POST ANALYSIS ---"
 	message_cmd_log "------------------------------------------------------------------------"
 
-	# create tmp copy of results
+	# create copy of results
 	cd $pipeline_dir
-	tmp_file=tmp_output.csv
 	mlst_file=mlst_output.csv
-	if [[ -f $tmp_file ]]; then rm $tmp_file; fi
 	if [[ -f $mlst_file ]]; then rm $mlst_file; fi
-
-	cp $phoenix_results $tmp_file
-	cp $phoenix_results $pipeline_results
-	sed -i "s/\t/;/g" $tmp_file
+	cat $phoenix_results | uniq > $pipeline_results
 	sed -i "s/\t/;/g" $pipeline_results
 
 	# review synopsis and determine status
@@ -374,36 +369,36 @@ if [[ $flag_post == "Y" ]]; then
 		num_of_fails=`cat $synopsis | grep -v "completed as FAILED" | grep "FAILED" | wc -l`
 
 		# review lab results
-		labValue=`cat $lab_results | grep $sample_id | cut -f2 -d";" | sort | uniq`
-		pipelineValue=`cat $phoenix_results | grep $sample_id | awk -F"\t" '{print $9}' | sort | uniq`
+		labValue=`cat $lab_results | grep $sample_id | cut -f2 -d";" | sort | awk '{print $1}'`
+		pipelineValue=`cat $phoenix_results | grep $sample_id | awk -F"\t" '{print $9}' | sort | awk '{print $1}'`
 		pipelineStatus=`cat $phoenix_results | grep $sample_id | awk -F"\t" '{print $2}'`
-
+		
 		# message if the lab didnt give results
 		if [[ $labValue == "" ]]; then echo "Missing lab value: $sample_id"; fi
 
 		# update the results and reasons
 		SID=$(awk -F"\t" -v sid=$sample_id '{ if ($1 == sid) print NR }' $phoenix_results)
 		if [[ $num_of_warnings -gt 4 ]]; then
+			echo "--fail: exceeds warnings"
 			reason=$(cat $synopsis | grep -v "Summarized" | grep -E "WARNING|FAIL" | awk -F": " '{print $3}' |  awk 'BEGIN { ORS = "; " } { print }' | sed "s/; ; //g")
 			cat $phoenix_results | awk -F"\t" -v i=$SID -v reason="${reason}" 'BEGIN {OFS = FS} NR==i {$2="FAIL"; $24=reason}1' > $pipeline_results
 		else
 			if [[ $pipelineStatus == "PASS" && *"$pipelineValue" != *"$labValue"*  ]]; then
 				reason="Lab Discordance"
 				cat $phoenix_results | awk -F"\t" -v i=$SID -v reason="${reason}" 'BEGIN {OFS = FS} NR==i {$2="FAIL"; $24=reason}1' > $pipeline_results
-				echo "Lab Discordance: $pipelineValue versus $labValue"
+				echo "fail: discordance found $pipelineValue versus $labValue"
 				exit
 			else
-				cp $pipeline_results $tmp_file
+				echo "--pass"
 			fi
 		fi
 
 		# set taxonomy
-        Species=`cat $phoenix_results | awk -F"\t" -v i=$sample_id 'FNR == i {print $9}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
-        MLST_1=`cat $phoenix_results | awk -F"\t" -v i=$sample_id 'FNR == i {print $16}'| cut -f1 -d","`
-        MLST_Scheme_1=`cat $phoenix_results | awk -F"\t" -v i=$sample_id 'FNR == i {print $15}'`
-        MLST_2=`cat $phoenix_results | awk -F"\t" -v i=$sample_id 'FNR == i {print $18}'| cut -f1 -d","`
-        MLST_Scheme_2=`cat $phoenix_results | awk -F"\t" -v i=$sample_id 'FNR == i {print $17}'`
-        
+        MLST_1=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $16}' | sort | uniq | cut -f1 -d","`
+        MLST_Scheme_1=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $15}' | sort | uniq`
+        MLST_2=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $18}'| sort | uniq | cut -f1 -d","`
+        MLST_Scheme_2=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $17}'| sort | uniq`
+
 		# handle schemes that have parenthesis
         if [[ $MLST_Scheme_1 =~ "(" ]]; then MLST_Scheme_1=`echo $MLST_Scheme_1 | sed -E -n 's/.*\((.*)\).*$/\1/p'`; fi
         if [[ $MLST_Scheme_2 =~ "(" ]]; then MLST_Scheme_2=`echo $MLST_Scheme_2 | sed -E -n 's/.*\((.*)\).*$/\1/p'`; fi
@@ -422,20 +417,16 @@ if [[ $flag_post == "Y" ]]; then
 		
 		# Add MLST
 		awk -v add="$sequence_classification;$labValue" -v sample="$sample_id" '$0 ~ sample {print $0";"add}' "$pipeline_results" >> "$mlst_file"
-
-		# save changes
-		cp $pipeline_results $tmp_file
     done
 
 	# cleanup
-	rm $tmp_file
-	mv $mlst_file $pipeline_results
+	cat $mlst_file | sort | uniq > $pipeline_results
 
 	# stats
-	num_samples=`cat $pipeline_results | wc -l`
+	num_samples=`cat $pipeline_results | grep -v "ID" | wc -l`
 	num_discordance=`cat $pipeline_results | grep "Discordance" | wc -l`
 	num_concordant=`cat $pipeline_results | grep "PASS" | wc -l`
 	num_failed=`cat $pipeline_results | grep -v "Discordance" | awk '{print $2}' | grep "FAIL" | wc -l`
 
-	echo "There are $num_samples samples | Lab: $num_concordant (concordant) vs $num_discordance (discordant), $num_failed were failures."
+	echo "TOTAL: $num_samples | PASSED: $num_concordant | FAILED: $num_discordance discordant, $num_failed other failures"
 fi 

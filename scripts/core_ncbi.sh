@@ -80,13 +80,17 @@ if [[ $flag_batch == "Y" ]]; then
 	cat $pipeline_results | grep "PASS" | awk -F";" '{print $1}' | uniq > passed_samples
 	IFS=$'\n' read -d '' -r -a sample_list < passed_samples
 	for id in "${sample_list[@]}"; do
-		wgs_id=`cat wgs_db/wgs_db_master.csv | grep $id | cut -f1 -d","`
-		srr_old=`cat srr_db/srr_db_master.csv | grep $wgs_id | cut -f1 -d","` 
-		if [[ $srr_old == "" ]]; then
-			echo "NEW SAMPLE: $id ($wgs_id)"
-			echo $id >> $passed_samples
+		if [[ $id == *"SRR"* ]]; then
+			echo "SRR sample: $id"
 		else
-			echo "SRR already exists: $srr_old ($id)"
+			wgs_id=`cat wgs_db/wgs_db_master.csv | grep $id | cut -f1 -d","`
+			srr_old=`cat srr_db/srr_db_master.csv | grep $wgs_id | cut -f1 -d","` 
+			if [[ $srr_old == "" ]]; then
+				echo "NEW SAMPLE: $id ($wgs_id)"
+				echo $id >> $passed_samples
+			else
+				echo "SRR already exists: $srr_old ($id)"
+			fi
 		fi
 	done
 

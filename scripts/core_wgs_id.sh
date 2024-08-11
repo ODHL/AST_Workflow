@@ -55,7 +55,7 @@ if [[ $flag_ids == "Y" ]]; then
     # for each sample, check ID file
     first_grab="Y"
     for sample_id in ${sample_list[@]}; do
-        if [[ $sample_id != "ID" ]] || [[ $sample_id != "PASS" ]]; then
+        if [[ $sample_id != "ID" ]] && [[ $sample_id != *"SRR"* ]]; then
             sample_id=$(clean_file_names $sample_id)
             echo "--sample: $sample_id"
 
