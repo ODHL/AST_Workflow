@@ -316,7 +316,7 @@ if(exists('ar_summary')){
 
 ### Lab Concordance
 ```{r lab_conc, echo=FALSE}
-passed_meta %>%
+sample_meta %>%
   DT::datatable(
     extensions = c("Buttons","Scroller"),
     rownames=FALSE,

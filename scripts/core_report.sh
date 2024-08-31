@@ -44,9 +44,11 @@ flag_outbreak="N"
 if [[ $subworkflow == "REPORT" ]]; then
     flag_report="Y"
 elif [[ $subworkflow == "BASIC" ]]; then
+    flag_report="Y"
     flag_basic="Y"
     analysis_cmd_trailing=$config_basic_report_cmd_trailing
 elif [[ $subworkflow == "OUTBREAK" ]]; then
+    flag_report="Y"
     flag_outbreak="Y"
     analysis_cmd_trailing=$config_outbreak_report_cmd_trailing
 else
@@ -128,7 +130,7 @@ if [[ $flag_report == "Y" ]]; then
         echo "----$srr_number"
         echo "----$samn_number"
 
-        # get MLST;u $9}' | sed "s/([0-9]*.[0-9]*%)//g" | sed "s/  //g"`
+        Species=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $9}'| cut -f1 -d","`
         MLST_1=`cat $pipeline_results | awk -F";" -v i=$SID 'FNR == i {print $16}'| cut -f1 -d","`
         MLST_Scheme_1=`cat $pipeline_results | sort | uniq | awk -F";" -v i=$SID 'FNR == i {print $15}'`
         MLST_2=`cat $pipeline_results | sort | uniq | awk -F";" -v i=$SID 'FNR == i {print $18}'| cut -f1 -d","`

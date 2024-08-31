@@ -117,6 +117,7 @@ if [[ $flag_ids == "Y" ]]; then
                 echo -e "$sample_id,NO_ID" >> $wgs_results
             else
                 echo "Something is wrong"
+                echo "--$check"
             fi
         fi
     done

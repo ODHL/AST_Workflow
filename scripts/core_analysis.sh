@@ -361,10 +361,11 @@ if [[ $flag_post == "Y" ]]; then
 		# pull only ID
 		sample_id=$(clean_file_names $sample_id)
 
-		# set synoposis file
-		synopsis=$log_dir/pipeline/$sample_id.synopsis
+		# pull stats
+		cat $qc_dir/${sample_id}_trimmed_read_counts.txt >> $intermed_dir/stats.txt
 
-		# # determine number of warnings, fails
+		# determine number of warnings, fails
+		synopsis=$log_dir/pipeline/$sample_id.synopsis
 		num_of_warnings=`cat $synopsis | grep -v "WARNINGS" | grep "WARNING" | wc -l`
 		num_of_fails=`cat $synopsis | grep -v "completed as FAILED" | grep "FAILED" | wc -l`
 
@@ -381,13 +382,14 @@ if [[ $flag_post == "Y" ]]; then
 		if [[ $num_of_warnings -gt 4 ]]; then
 			echo "--fail: exceeds warnings"
 			reason=$(cat $synopsis | grep -v "Summarized" | grep -E "WARNING|FAIL" | awk -F": " '{print $3}' |  awk 'BEGIN { ORS = "; " } { print }' | sed "s/; ; //g")
-			cat $phoenix_results | awk -F"\t" -v i=$SID -v reason="${reason}" 'BEGIN {OFS = FS} NR==i {$2="FAIL"; $24=reason}1' > $pipeline_results
+			cat $pipeline_results | awk -F";" -v i=$SID -v reason="${reason}" 'BEGIN {OFS = FS} NR==i {$2="FAIL"; $24=reason}1' > tmp; mv tmp $pipeline_results
 		else
 			if [[ $pipelineStatus == "PASS" && *"$pipelineValue" != *"$labValue"*  ]]; then
 				reason="Lab Discordance"
-				cat $phoenix_results | awk -F"\t" -v i=$SID -v reason="${reason}" 'BEGIN {OFS = FS} NR==i {$2="FAIL"; $24=reason}1' > $pipeline_results
-				echo "fail: discordance found $pipelineValue versus $labValue"
-				exit
+				cat $pipeline_results | awk -F";" -v i=$SID -v reason="${reason}" 'BEGIN {OFS = FS} NR==i {$2="FAIL"; $24=reason}1' > tmp; mv tmp $pipeline_results
+				echo "***"
+				echo "FAILED: discordance found $pipelineValue versus $labValue"
+				echo "***"
 			else
 				echo "--pass"
 			fi
