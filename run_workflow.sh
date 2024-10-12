@@ -274,6 +274,10 @@ elif [[ "$pipeline" == "report" ]]; then
                 "${pipeline_log}"
 
 ######################## Run validation
+elif [[ "$pipeline" == "stats" ]]; then
+        # generate report
+        bash scripts/core_stats.sh $pipeline_results
+######################## Run validation
 elif [[ "$pipeline" == "validation" ]]; then
         # generate report
         bash scripts/ast_validation.sh $subworkflow $project_name_full $output_dir $pipeline_log

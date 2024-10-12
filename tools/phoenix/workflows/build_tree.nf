@@ -30,12 +30,12 @@ include { ASSET_CHECK                    } from '../modules/local/asset_check'
 include { CFSAN                          } from '../modules/odhl/cfsan' // Run CFSAN-SNP Pipeline
 include { ROARY                          } from '../modules/odhl/roary' // Perform core genome alignment using Roary
 include { TREE                           } from '../modules/odhl/core_genome_tree' //Infer ML tree from core genome alignment using IQ-TREE
-include { SAMESTR_DB                     } from '../modules/odhl/samestr_db'
-include { MOTUS                          } from '../modules/odhl/motus'
-include { SAMTOOLS_SORT                  } from '../modules/odhl/samtools_sort'
-include { SAMESTR_CONVERT                } from '../modules/odhl/samestr_convert'
-include { SAMESTR_EXTRACT                } from '../modules/odhl/samestr_extract'
-include { SAMESTR_MERGE                  } from '../modules/odhl/samestr_merge'
+// include { SAMESTR_DB                     } from '../modules/odhl/samestr_db'
+// include { MOTUS                          } from '../modules/odhl/motus'
+// include { SAMTOOLS_SORT                  } from '../modules/odhl/samtools_sort'
+// include { SAMESTR_CONVERT                } from '../modules/odhl/samestr_convert'
+// include { SAMESTR_EXTRACT                } from '../modules/odhl/samestr_extract'
+// include { SAMESTR_MERGE                  } from '../modules/odhl/samestr_merge'
 
 /*
 ========================================================================================

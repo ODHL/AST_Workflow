@@ -248,8 +248,10 @@ if [[ $flag_analysis == "Y" ]]; then
 		message_cmd_log "--Downloading analysis files (this may take a few minutes to begin)"
 		message_cmd_log "--Starting time: `date`"
 		for sample_id in ${batch_list[@]}; do
-			$config_basespace_cmd download biosample --quiet -n "${sample_id}" -o $dl_dir
-			mv $dl_dir/$sample_id*/*gz $fastq_dir
+			if [[ ! -f "$fastq_dir/$sample_id*" ]]; then
+				$config_basespace_cmd download biosample --quiet -n "${sample_id}" -o $dl_dir
+				mv $dl_dir/$sample_id*/*gz $fastq_dir
+			fi
 		done
 
 		# move to final dir, clean
@@ -259,7 +261,7 @@ if [[ $flag_analysis == "Y" ]]; then
 		done
 		clean_file_insides $samplesheet
 		clean_file_insides $batch_manifest
-	
+
 		# set batch name
 		if [[ "$batch_id" -gt 9 ]]; then batch_name=$batch_id; else batch_name=0${batch_id}; fi
 		
@@ -395,7 +397,8 @@ if [[ $flag_post == "Y" ]]; then
 			fi
 		fi
 
-		# set taxonomy
+		# set MLST scheme
+		species=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $9}' | sort | uniq`
         MLST_1=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $16}' | sort | uniq | cut -f1 -d","`
         MLST_Scheme_1=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $15}' | sort | uniq`
         MLST_2=`cat $pipeline_results | grep $sample_id | awk -F";" '{print $18}'| sort | uniq | cut -f1 -d","`
@@ -407,13 +410,13 @@ if [[ $flag_post == "Y" ]]; then
 
         # check if the first scheme exists
 		if [[ $MLST_1 == "-" ]] || [[ $MLST_1 == *"Novel"* ]]; then
-            sequence_classification=""
+            sequence_classification="MLST__${species}"
         else
 			# check if there is a second MLST
 			if [[ $MLST_2 == "-" ]]; then
-				sequence_classification=`echo "ML${MLST_1}_${MLST_Scheme_1}"`
+				sequence_classification=`echo "ML${MLST_1}_${MLST_Scheme_1}_${species}"`
 			else
-				sequence_classification=`echo "ML${MLST_1}_${MLST_Scheme_1},ML${MLST_2}_${MLST_Scheme_2}"`
+				sequence_classification=`echo "ML${MLST_1}_${MLST_Scheme_1}_${species}-ML${MLST_2}_${MLST_Scheme_2}_${species}"`
 			fi
         fi
 		
@@ -423,12 +426,4 @@ if [[ $flag_post == "Y" ]]; then
 
 	# cleanup
 	cat $mlst_file | sort | uniq > $pipeline_results
-
-	# stats
-	num_samples=`cat $pipeline_results | grep -v "ID" | wc -l`
-	num_discordance=`cat $pipeline_results | grep "Discordance" | wc -l`
-	num_concordant=`cat $pipeline_results | grep "PASS" | wc -l`
-	num_failed=`cat $pipeline_results | grep -v "Discordance" | awk '{print $2}' | grep "FAIL" | wc -l`
-
-	echo "TOTAL: $num_samples | PASSED: $num_concordant | FAILED: $num_discordance discordant, $num_failed other failures"
 fi 

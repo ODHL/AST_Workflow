@@ -295,14 +295,14 @@ if(exists('ar_summary')){
       }
     }
   }
-  # strip rownames, order by gene name
-  row.names(output_df) <- NULL
-  output_df <- output_df[order(output_df$Gene),]
   
   # if there are consensus genes then print table
   if (nrow(output_df)==0){
     print("There are no genes with consensus between at least 50% of samples")
   } else{
+    # strip rownames, order by gene name
+    row.names(output_df) <- NULL
+    output_df <- output_df[order(output_df$Gene),]
     DT::datatable(output_df,
           rownames = FALSE,
           extensions = 'RowGroup',

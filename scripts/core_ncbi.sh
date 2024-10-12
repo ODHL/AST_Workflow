@@ -35,6 +35,13 @@ basespace_command=${config_basespace_cmd}
 
 # backup
 cp srr_db/srr_db_master.csv srr_db/srr_db_backup.csv
+
+# determine limsID
+limsID=`ls $log_dir/manifests/*AR.csv | cut -f2 -d"_"`
+if [[ $limsID != "AR" ]] & [[ -f "$log_dir/manifests/${project_id}_${limsID}_AR.csv" ]]; then
+	echo "updating manifest"
+	mv "$log_dir/manifests/${project_id}_${limsID}_AR.csv" ${log_dir}/manifests/${project_id}_AR.csv
+fi
 #########################################################
 # Controls
 #########################################################
@@ -297,5 +304,5 @@ if [[ "$flag_post" == "Y" ]]; then
 	done
 
 	cat $ncbi_results
-	mv srr_db/srr_db_tmp.csv srr_db/srr_db_master.csv
+	cat srr_db/srr_db_tmp.csv | sort | uniq > srr_db/srr_db_master.csv
 fi
